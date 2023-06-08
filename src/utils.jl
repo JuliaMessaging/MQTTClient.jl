@@ -48,3 +48,8 @@ function read_len(s::IO)
     end
     return value
 end
+
+function mqtt_channel(len::Int) 
+    RemoteChannel(()->Channel{Packet}(len))
+end
+mqtt_channel() = mqtt_channel(60)

@@ -75,7 +75,7 @@ mutable struct Client
     last_id::UInt16
     in_flight::Dict{UInt16, Future}
 
-    write_packets::Channel{Packet}
+    write_packets::RemoteChannel
     socket
     socket_lock # TODO add type
 
@@ -91,7 +91,7 @@ mutable struct Client
                                    0x0000,
                                    0x0000,
                                    Dict{UInt16, Future}(),
-                                   Channel{Packet}(60),
+                                   mqtt_channel(),
                                    TCPSocket(),
                                    ReentrantLock(),
                                    60,
@@ -104,7 +104,7 @@ mutable struct Client
                                                          0x0000,
                                                          0x0000,
                                                          Dict{UInt16, Future}(),
-                                                         Channel{Packet}(60),
+                                                         mqtt_channel(),
                                                          TCPSocket(),
                                                          ReentrantLock(),
                                                          ping_timeout,
@@ -154,7 +154,8 @@ function handle_publish(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     end
 
     payload = take!(s)
-    @async client.on_msg(topic, payload)
+    Dagger.@spawn client.on_msg(topic, payload)
+    # @async client.on_msg(topic, payload)
 end
 
 function handle_ack(client::Client, s::IO, cmd::UInt8, flags::UInt8)
@@ -356,18 +357,21 @@ function connect_async(client::Client, host::AbstractString, port::Integer=1883;
                        will::Message=Message(false, 0x00, false, "", Array{UInt8}()),
                        clean_session::Bool=true)
 
-    client.write_packets = Channel{Packet}(client.write_packets.sz_max)
+    client.write_packets = mqtt_channel()
     try
         client.keep_alive = convert(UInt16, keep_alive)
     catch
         error("Could not convert keep_alive to UInt16")
     end
     client.socket = connect(host, port)
-    @async write_loop(client)
-    @async read_loop(client)
+    Dagger.@spawn write_loop(client)
+    Dagger.@spawn read_loop(client)
+    # @async write_loop(client)
+    # @async read_loop(client)
 
     if client.keep_alive > 0x0000
-        @async keep_alive_loop(client)
+        Dagger.@spawn keep_alive_loop(client)
+        # @async keep_alive_loop(client)
     end
 
     #TODO reset client on clean_session = true

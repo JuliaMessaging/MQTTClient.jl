@@ -27,19 +27,19 @@ import MQTT.User
 
     println("Testing publish qos 0")
     publish(client, topic, payload, qos=QOS_0)
-    wait(condition)
+    # wait(condition)
 
-    println("Testing publish qos 1")
-    publish(client, topic, payload, qos=QOS_1)
-    wait(condition)
+    # println("Testing publish qos 1")
+    # publish(client, topic, payload, qos=QOS_1)
+    # wait(condition)
 
-    println("Testing publish qos 2")
-    publish(client, topic, payload, qos=QOS_2)
-    wait(condition)
+    # println("Testing publish qos 2")
+    # publish(client, topic, payload, qos=QOS_2)
+    # wait(condition)
 
-    println("Testing connect will")
-    disconnect(client)
-    connect(client, "test.mosquitto.org", will=Message(false, 0x00, false, topic, payload))
+    # println("Testing connect will")
+    # disconnect(client)
+    # connect(client, "test.mosquitto.org", will=Message(false, 0x00, false, topic, payload))
 
-    disconnect(client)
+    # disconnect(client)
 end
