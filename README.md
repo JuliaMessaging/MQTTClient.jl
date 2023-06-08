@@ -7,7 +7,14 @@ MQTT Client Library
 
 This code builds a library which enables applications to connect to an MQTT broker to publish messages, and to subscribe to topics and receive published messages.
 
-This library supports: fully asynchronous operation, file persistence
+This library supports: fully multi threaded operation with Dagger.jl, file persistence
+
+### Performance 
+
+* publishing 300 messages on 10 topics with 4 threads takes 1274 milliseconds
+* publishing 300 messages on 1 topic without async takes 26205 milliseconds
+* publishing 300 messages on 10 topics with single thread async 1350 milliseconds
+
 
 Contents
 --------

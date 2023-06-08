@@ -1,6 +1,7 @@
 module MQTT
 
-using Distributed: Future
+using Distributed: Future, RemoteChannel
+using Dagger
 using Sockets: TCPSocket
 import Sockets: connect
 using Random: randstring
@@ -9,6 +10,7 @@ using Base.Threads, Dates
 
 include("utils.jl")
 include("client.jl")
+# include("precompile.jl")
 
 export
     Client,

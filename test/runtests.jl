@@ -9,8 +9,8 @@ import Base: read, write, close
 import MQTT: read_len, Message
 
 include("smoke.jl")
-include("mocksocket.jl")
-include("packet.jl")
+# include("mocksocket.jl")
+# include("packet.jl")
 include("unittests.jl")
 
 end # module
