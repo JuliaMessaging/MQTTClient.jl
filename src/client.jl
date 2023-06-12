@@ -27,15 +27,59 @@ const CONNECTION_REFUSED_SERVER_UNAVAILABLE = 0x03
 const CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD = 0x04
 const CONNECTION_REFUSED_NOT_AUTHORIZED = 0x05
 
+"""
+    struct MQTTException <: Exception
+        msg::AbstractString
+    end
+
+    A custom exception type for MQTT errors.
+
+    # Examples
+    ```julia-repl
+    julia> throw(MQTTException(\"Connection refused: Not authorized\"))
+    MQTTException(\"Connection refused: Not authorized\")
+    ```
+"""
 struct MQTTException <: Exception
     msg::AbstractString
 end
 
+"""
+    Packet
+
+A composite type representing a packet.
+
+# Fields
+
+- `cmd::UInt8`: an 8-bit unsigned integer representing the command.
+- `data::Any`: any value representing the data.
+
+"""
 struct Packet
     cmd::UInt8
     data::Any
 end
 
+"""
+    Message
+
+A composite type representing a message.
+
+# Fields
+
+- `dup::Bool`: a boolean indicating whether the message is a duplicate.
+- `qos::UInt8`: an 8-bit unsigned integer representing the quality of service.
+- `retain::Bool`: a boolean indicating whether the message should be retained.
+- `topic::String`: a string representing the topic.
+- `payload::Array{UInt8}`: an array of 8-bit unsigned integers representing the payload.
+
+# Constructors
+
+- `Message(qos::QOS, topic::String, payload...)`: constructs a new message with default values for `dup` and `retain`.
+- `Message(dup::Bool, qos::QOS, retain::Bool, topic::String, payload...)`: constructs a new message with all fields specified.
+- `Message(dup::Bool, qos::UInt8, retain::Bool, topic::String, payload...)`: constructs a new message with all fields specified.
+
+"""
 struct Message
     dup::Bool
     qos::UInt8
@@ -44,11 +88,11 @@ struct Message
     payload::Array{UInt8}
 
     function Message(qos::QOS, topic::String, payload...)
-        return Message(false, convert(UInt8, qos), false, topic, payload...)
+        return Message(false, UInt8(qos), false, topic, payload...)
     end
 
     function Message(dup::Bool, qos::QOS, retain::Bool, topic::String, payload...)
-        return Message(dup, convert(UInt8, qos), retain, topic, payload...)
+        return Message(dup, UInt8(qos), retain, topic, payload...)
     end
 
     function Message(dup::Bool, qos::UInt8, retain::Bool, topic::String, payload...)
@@ -62,11 +106,53 @@ struct Message
     end
 end
 
+"""
+    User(name::String, password::String)
+
+A struct that represents a user with a name and password.
+
+# Examples
+```julia
+julia> user = User("John", "password")
+User("John", "password")
+```
+"""
 struct User
     name::String
     password::String
 end
 
+"""
+    Client(on_msg::Function[, ping_timeout::UInt64])
+
+A mutable struct that represents an MQTT client.
+
+# Arguments
+- `on_msg::Function`: A function that will be called when a message is received.
+- `ping_timeout::UInt64`: The number of seconds to wait for a ping response before disconnecting. Default is 60.
+
+# Fields
+- `on_msg::Function`: The function that will be called when a message is received.
+- `keep_alive::UInt16`: The number of seconds between pings.
+- `last_id::UInt16`: The last message ID used.
+- `in_flight::Dict{UInt16, Future}`: A dictionary of messages that are waiting for a response.
+- `write_packets::RemoteChannel`: A channel for writing packets to the socket.
+- `socket`: The socket used for communication.
+- `socket_lock`: A lock for the socket.
+- `ping_timeout::UInt64`: The number of seconds to wait for a ping response before disconnecting.
+- `ping_outstanding::Atomic{UInt8}`: A flag indicating whether a ping has been sent but not yet received.
+- `last_sent::Atomic{Float64}`: The time the last packet was sent.
+- `last_received::Atomic{Float64}`: The time the last packet was received.
+
+# Examples
+```julia
+julia> client = Client(on_msg)
+Client(on_msg, 60)
+
+julia> client = Client(on_msg, 30)
+Client(on_msg, 30)
+```
+"""
 mutable struct Client
     on_msg::Function
     keep_alive::UInt16
@@ -123,6 +209,22 @@ const CONNACK_ERRORS = Dict{UInt8, String}(
                                            0x05 => "connection refused not authorized",
                                           )
 
+"""
+    handle_connack(client::Client, s::IO, cmd::UInt8, flags::UInt8)
+
+Handle a `CONNACK` packet.
+
+# Arguments
+- `client::Client`: The client that received the packet.
+- `s::IO`: The socket used for communication.
+- `cmd::UInt8`: The command byte.
+- `flags::UInt8`: The flags byte.
+
+# Examples
+```julia
+julia> handle_connack(client, s, 0x20, 0x00)
+```
+"""
 function handle_connack(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     session_present = read(s, UInt8)
     return_code = read(s, UInt8)
@@ -136,6 +238,21 @@ function handle_connack(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     end
 end
 
+"""
+    handle_publish(client::Client, s::IO, cmd::UInt8, flags::UInt8)
+
+This function handles the publish command in MQTT protocol. 
+
+# Arguments
+- `client`: A client object.
+- `s`: An input stream.
+- `cmd`: An unsigned 8-bit integer.
+- `flags`: An unsigned 8-bit integer.
+
+# Returns
+Future.
+
+"""
 function handle_publish(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     dup = (flags & 0x08) >> 3
     qos = (flags & 0x06) >> 1
@@ -216,6 +333,18 @@ function packet_id(client)
     return client.last_id
 end
 
+"""
+    write_loop(client)
+
+This function writes data to the socket.
+
+# Arguments
+- `client`: A client object.
+
+# Returns
+Nothing.
+
+"""
 function write_loop(client)
     try
         while true
@@ -242,6 +371,19 @@ function write_loop(client)
     end
 end
 
+"""
+    read_loop(client)
+
+Reads data from a client socket and processes it.
+
+# Arguments
+- `client`: A client object.
+
+# Example
+```julia
+read_loop(client)
+```
+"""
 function read_loop(client)
     try
         while true
@@ -435,6 +577,7 @@ connect(client::Client, host::AbstractString, port::Integer=1883;
         user::User=User("", ""),
         will::Message=Message(false, 0x00, false, "", UInt8[]),
         clean_session::Bool=true) = get(connect_async(client, host, port, keep_alive=keep_alive, client_id=client_id, user=user, will=will, clean_session=clean_session))
+
 
 """
     disconnect(client::Client)

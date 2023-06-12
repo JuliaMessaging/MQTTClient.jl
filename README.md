@@ -1,7 +1,11 @@
 # MQTT.jl
 
-[![Build Status](https://travis-ci.org/rweilbacher/MQTT.jl.svg?branch=master)](https://travis-ci.org/rweilbacher/MQTT.jl)
-[![Coverage Status](https://coveralls.io/repos/github/kivaari/MQTT.jl/badge.svg?branch=master)](https://coveralls.io/github/kivaari/MQTT.jl?branch=master)
+
+[![Build Status](https://travis-ci.org/EchoJulia/EchoJulia.jl.svg?branch=master)](https://travis-ci.org/NickMcSweeney/MQTT.jl)
+
+[![Coverage Status](https://coveralls.io/repos/EchoJulia/EchoJulia.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/NickMcSweeney/MQTT.jl?branch=master)
+
+[![codecov.io](http://codecov.io/github/EchoJulia/EchoJulia.jl/coverage.svg?branch=master)](http://codecov.io/github/NickMcSweeney/MQTT.jl?branch=master)
 
 MQTT Client Library
 
@@ -56,7 +60,7 @@ Contents
 Installation
 ------------
 ```julia
-Pkg.clone("https://github.com/rweilbacher/MQTT.jl.git")
+Pkg.clone("https://github.com/NickMcSweeney/MQTT.jl.git")
 ```
 Testing
 -------
@@ -338,3 +342,28 @@ For storing messages that are awaiting acknowledgment, `Client` has a `Dict`, ma
 Once the connect method is called on a `Client`, relevant fields are initialized and the julia `connect` method is called to get a connected socket. Then two background tasks are started that perpetually check for messages to send and receive. If `keep_alive` is non-zero another tasks get started that handles sending the keep alive and verifying the pingresp arrived in time.
 
 TODO explain read and write loop a bit
+
+## Contributing
+
+This package's development is sponsored by [MapXact](mapxact.com/) and used in production systems at MapXact. However, this is an open source project, and contrubutions and feature requests are welcome. 
+
+### TODO
+
+* Add documentation with documenter
+* Review unit tests
+    * fix tests so that they actually work
+* Review examples
+* protocol error handling
+* reconnect
+* persistence (in memory, files)
+* start documentation
+* look at enums and how to use them
+* qos2 
+    * separate handle_pubrecrel into two different methods and fix them
+* fix connect method
+    * make it not hardcoded
+* disconnect_async/disconnect
+    * think about what we need to do and how
+    * the reconnect should still work
+* put handle methods to other file
+* implement clean session = false
