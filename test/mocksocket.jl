@@ -1,3 +1,6 @@
+import Sockets
+import Base: read, close
+
 # commands
 const CONNECT = 0x10
 const CONNACK = 0x20
@@ -119,7 +122,7 @@ function read_all_to_arr(filename)
     return data
 end
 
-function connect(host::AbstractString, port::Integer)
+function Sockets.connect(host::AbstractString, port::Integer)
     th = TestFileHandler(Channel{UInt8}(256), Channel{UInt8}(256), Condition(), Condition(), false)
     put_from_file(th, "data/input/connack.dat")
     return th

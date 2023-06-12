@@ -30,7 +30,42 @@ end
     @test a == b
 end
 
-@testset "MQTT Client" begin
-    c = MQTT.Client((p,t) -> println(p,t))
-    @test c isa MQTT.Client
+
+@testset verbose = true "MQTT Client functionality" begin
+    @testset "MQTT Client" begin
+        c = MQTT.Client((p,t) -> println(p,t))
+        @test c isa MQTT.Client   
+    end
+
+    @testset "MQTT Message" begin
+        m = MQTT.Message(true, 0x00, true, "test/mqtt_jl", "testing the MQTT.jl package")
+        @test m isa MQTT.Message
+    end
+
 end
+
+@testset "MQTT subscribe async" begin
+    c = MQTT.Client((p,t) -> println(p,t))
+    fut = MQTT.subscribe_async(c, ("test-topic/#", MQTT.QOS_2))
+    @test fut isa Distributed.Future
+end
+
+@testset "MQTT subscribe async" begin
+    c = MQTT.Client((p,t) -> println(p,t))
+    fut = MQTT.publish_async(c, "test-topic/mqtt_jl", "test message")
+    @test fut isa Distributed.Future
+end
+
+# @testset "MQTT connect" begin
+#     c = MQTT.Client((p,t) -> println(p,t))
+#     session_present_bit = MQTT.connect(
+#         c,
+#         "test.mosquitto.org",
+#         1883,
+#         client_id = "test-mqtt-jll",
+#         keep_alive = 600,
+#         clean_session = true,
+#         will = MQTT.Message(true, 0x00, true, "test/mqtt_jl", "testing the MQTT.jl package"),
+#     )
+#     @test session_present_bit === 0x00
+# end
