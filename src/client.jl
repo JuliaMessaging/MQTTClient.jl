@@ -245,6 +245,7 @@ function handle_connack(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     if return_code == CONNECTION_ACCEPTED
         put!(future, session_present)
     else
+        #! TODO: This could be handled better maybe?
         error = CONNACK_ERRORS[return_code]
         put!(future, MQTTException(error))
     end
