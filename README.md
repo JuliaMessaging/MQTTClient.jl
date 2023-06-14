@@ -1,23 +1,16 @@
 # MQTT.jl
 
+[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://NickMcSweeney.github.io/MQTT.jl/stable/)
+[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://NickMcSweeney.github.io/MQTT.jl/dev/)
+[![Build Status](https://github.com/NickMcSweeney/MQTT.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/NickMcSweeney/MQTT.jl/actions/workflows/CI.yml?query=branch%3Amain)
+[![Coverage](https://codecov.io/gh/NickMcSweeney/MQTT.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/NickMcSweeney/MQTT.jl)
+[![Coverage](https://coveralls.io/repos/github/NickMcSweeney/MQTT.jl/badge.svg?branch=main)](https://coveralls.io/github/NickMcSweeney/MQTT.jl?branch=main)
+[![Code Style: Blue](https://img.shields.io/badge/code%20style-blue-4495d1.svg)](https://github.com/invenia/BlueStyle)
+[![PkgEval](https://JuliaCI.github.io/NanosoldierReports/pkgeval_badges/M/MQTT.svg)](https://JuliaCI.github.io/NanosoldierReports/pkgeval_badges/report.html)
 
-[![Build Status](https://travis-ci.org/EchoJulia/EchoJulia.jl.svg?branch=master)](https://travis-ci.org/NickMcSweeney/MQTT.jl)
+MQTT Client Library for Julia
 
-[![Coverage Status](https://coveralls.io/repos/EchoJulia/EchoJulia.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/NickMcSweeney/MQTT.jl?branch=master)
-
-[![codecov.io](http://codecov.io/github/EchoJulia/EchoJulia.jl/coverage.svg?branch=master)](http://codecov.io/github/NickMcSweeney/MQTT.jl?branch=master)
-
-MQTT Client Library
-
-This code builds a library which enables applications to connect to an MQTT broker to publish messages, and to subscribe to topics and receive published messages.
-
-This library supports: fully multi threaded operation with Dagger.jl, file persistence
-
-### Performance 
-
-* publishing 300 messages on 10 topics with 4 threads takes 1274 milliseconds
-* publishing 300 messages on 1 topic without async takes 26205 milliseconds
-* publishing 300 messages on 10 topics with single thread async 1350 milliseconds
+This library provides a powerful and easy-to-use interface for connecting to an MQTT broker, publishing messages, and subscribing to topics to receive published messages. It supports fully multi-threaded operation with Dagger.jl and file persistence for reliable message delivery.
 
 
 Contents
