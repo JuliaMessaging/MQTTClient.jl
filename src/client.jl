@@ -27,6 +27,18 @@ const CONNECTION_REFUSED_SERVER_UNAVAILABLE = 0x03
 const CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD = 0x04
 const CONNECTION_REFUSED_NOT_AUTHORIZED = 0x05
 
+macro dispatch(arg)
+    if Threads.nthreads() > 1
+        quote
+            Dagger.@spawn $arg
+        end
+    else
+        quote
+            @async $arg
+        end
+    end
+end
+
 """
     struct MQTTException <: Exception
         msg::AbstractString
@@ -271,8 +283,7 @@ function handle_publish(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     end
 
     payload = take!(s)
-    Dagger.@spawn client.on_msg(topic, payload)
-    # @async client.on_msg(topic, payload)
+    @dispatch client.on_msg(topic, payload)
 end
 
 function handle_ack(client::Client, s::IO, cmd::UInt8, flags::UInt8)
@@ -502,14 +513,11 @@ function connect_async(client::Client, host::AbstractString, port::Integer=1883;
         error("Could not convert keep_alive to UInt16")
     end
     client.socket = connect(host, port)
-    Dagger.@spawn write_loop(client)
-    Dagger.@spawn read_loop(client)
-    # @async write_loop(client)
-    # @async read_loop(client)
+    @dispatch write_loop(client)
+    @dispatch read_loop(client)
 
     if client.keep_alive > 0x0000
-        Dagger.@spawn keep_alive_loop(client)
-        # @async keep_alive_loop(client)
+        @dispatch keep_alive_loop(client)
     end
 
     #TODO reset client on clean_session = true
