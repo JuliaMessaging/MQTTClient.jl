@@ -58,7 +58,7 @@ end
     end
 
     @testset "MQTT Message" begin
-        msg = MQTT.Message(true, 0x00, true, "test/mqtt_jl", "testing the MQTT.jl package")
+        msg = MQTT.Message(true, QOS_0, true, "test/mqtt_jl", "testing the MQTT.jl package")
         @test msg isa MQTT.Message
 
         msg = MQTT.Message(false, 0x01, false, "test", "payload")
@@ -68,9 +68,9 @@ end
         @test msg.topic == "test"
         @test msg.payload == [UInt8('p'), UInt8('a'), UInt8('y'), UInt8('l'), UInt8('o'), UInt8('a'), UInt8('d')]
 
-        msg = MQTT.Message(MQTT.QOS_1, "test", "payload")
+        msg = MQTT.Message(MQTT.QOS_2, "test", "payload")
         @test msg.dup == false
-        @test msg.qos == 0x01
+        @test msg.qos == 0x02
         @test msg.retain == false
         @test msg.topic == "test"
         @test msg.payload == [UInt8('p'), UInt8('a'), UInt8('y'), UInt8('l'), UInt8('o'), UInt8('a'), UInt8('d')]
@@ -87,6 +87,35 @@ end
         c = MQTT.Client((p,t) -> println(p,t))
         fut = MQTT.publish_async(c, "test-topic/mqtt_jl", "test message")
         @test fut isa Distributed.Future
+    end
+
+    @testset "unsubscribe_async" begin
+        # Create a mock client object
+        client = Client((client, topic, message) -> nothing)
+
+        # Set the packet ID
+        id = 1
+        client.last_id = id
+
+        # Call the unsubscribe_async function with a single topic
+        future = unsubscribe_async(client, "topic1")
+
+        # Check that the in_flight dictionary was updated correctly
+        @test client.in_flight[0x0002] == future
+
+        # Check that the write_packet function was called with the correct arguments
+        p = take!(client.write_packets)
+        @test p == MQTT.Packet(MQTT.UNSUBSCRIBE  | 0x02, (0x0002, "topic1"))
+
+        # Call the unsubscribe_async function with multiple topics
+        future = unsubscribe_async(client, "topic1", "topic2", "topic3")
+
+        # Check that the in_flight dictionary was updated correctly
+        @test client.in_flight[0x0003] == future
+
+        # Check that the write_packet function was called with the correct arguments
+        p = take!(client.write_packets)
+        @test p == MQTT.Packet(MQTT.UNSUBSCRIBE  | 0x02, (0x0003, "topic1", "topic2", "topic3"))
     end
 end
 
