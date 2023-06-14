@@ -27,6 +27,5 @@ export
     publish_async,
     publish,
     disconnect,
-    get,
     MQTT_ERR_INVAL
 end

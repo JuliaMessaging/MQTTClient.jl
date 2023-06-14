@@ -409,6 +409,12 @@ function read_loop(client)
     end
 end
 
+"""
+    keep_alive_loop(client::Client)
+
+This function runs a loop that sends a PINGREQ message to the MQTT broker to keep the connection alive. The loop checks the connection at regular intervals determined by the `client.keep_alive` value. If no message has been sent or received within the keep-alive interval, a PINGREQ message is sent. If no PINGRESP message is received within the `client.ping_timeout` interval, the client is disconnected.
+"""
+
 function keep_alive_loop(client::Client)
     ping_sent = time()
 
@@ -462,16 +468,6 @@ end
 
 function write_packet(client::Client, cmd::UInt8, data...)
     put!(client.write_packets, Packet(cmd, data))
-end
-
-# the docs make it sound like fetch would alrdy work in this way
-# check julia sources
-function get(future)
-    r = fetch(future)
-    if typeof(r) <: Exception
-        throw(r)
-    end
-    return r
 end
 
 """
@@ -576,7 +572,7 @@ connect(client::Client, host::AbstractString, port::Integer=1883;
         client_id::String=randstring(8),
         user::User=User("", ""),
         will::Message=Message(false, 0x00, false, "", UInt8[]),
-        clean_session::Bool=true) = get(connect_async(client, host, port, keep_alive=keep_alive, client_id=client_id, user=user, will=will, clean_session=clean_session))
+        clean_session::Bool=true) = fetch(connect_async(client, host, port, keep_alive=keep_alive, client_id=client_id, user=user, will=will, clean_session=clean_session))
 
 
 """
@@ -644,7 +640,7 @@ end
 Unsubscribes the `Client` instance from the supplied topic names.
 Waits until the unsubscribe is fully acknowledged. Returns `nothing` on success and an exception on failure.
 """
-unsubscribe(client::Client, topics::String...) = get(unsubscribe_async(client, topics...))
+unsubscribe(client::Client, topics::String...) = fetch(unsubscribe_async(client, topics...))
 
 """
    publish_async(client::Client, message::Message)
@@ -694,7 +690,7 @@ publish_async(client::Client, topic::String, payload...;
  publish(client::Client, topic::String, payload...;
          dup::Bool=false,
          qos::QOS=QOS_0,
-         retain::Bool=false) = get(publish_async(client, topic, payload..., dup=dup, qos=qos, retain=retain))
+         retain::Bool=false) = fetch(publish_async(client, topic, payload..., dup=dup, qos=qos, retain=retain))
 
  # Helper method to check if it is possible to subscribe to a topic
  function filter_wildcard_len_check(sub)
