@@ -2,9 +2,9 @@
 CurrentModule = MQTTClient
 ```
 
-# MQTT
+# MQTTClient
 
-Documentation for [MQTT](https://github.com/NickMcSweeney/MQTTClient.jl).
+Documentation for [MQTTClient](https://github.com/NickMcSweeney/MQTTClient.jl).
 
 ```@index
 ```

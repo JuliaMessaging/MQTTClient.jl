@@ -1,5 +1,5 @@
 name = "MQTTClient"
-uuid = "7b5fea6c-6225-4b7d-8f4a-8782848a6463"
+uuid = "985f35cc-2c3d-4943-b8c1-f0931d5f0959"
 authors = ["Nick Shindler <nick@shindler.tech>"]
 version = "0.1.0"
 

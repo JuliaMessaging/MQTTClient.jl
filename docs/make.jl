@@ -3,10 +3,10 @@ push!(LOAD_PATH,"../src/")
 using MQTTClient
 using Documenter
 
-DocMeta.setdocmeta!(MQTT, :DocTestSetup, :(using MQTT); recursive=true)
+DocMeta.setdocmeta!(MQTTClient, :DocTestSetup, :(using MQTTClient); recursive=true)
 
 makedocs(;
-    modules=[MQTT],
+    modules=[MQTTClient],
     authors="Nick Shindler <nick@shindler.tech>",
     repo="https://github.com/NickMcSweeney/MQTTClient.jl/blob/{commit}{path}#{line}",
     sitename="MQTTClient.jl",
