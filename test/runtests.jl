@@ -3,6 +3,9 @@ using Test
 using MQTT
 using Distributed, Random
 
+import MQTT: topic_wildcard_len_check, filter_wildcard_len_check, MQTTException
+import Sockets.TCPSocket
+
 @testset verbose=true "client tests" begin
 include("unittest.client.jl")
 end
