@@ -1,14 +1,14 @@
 ```@meta
-CurrentModule = MQTT
+CurrentModule = MQTTClient
 ```
 
 # MQTT
 
-Documentation for [MQTT](https://github.com/NickMcSweeney/MQTT.jl).
+Documentation for [MQTT](https://github.com/NickMcSweeney/MQTTClient.jl).
 
 ```@index
 ```
 
 ```@autodocs
-Modules = [MQTT]
+Modules = [MQTTClient]
 ```
