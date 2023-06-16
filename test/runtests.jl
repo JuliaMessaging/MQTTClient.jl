@@ -1,9 +1,9 @@
 using Test
 
-using MQTT
+using MQTTClient
 using Distributed, Random
 
-import MQTT: topic_wildcard_len_check, filter_wildcard_len_check, MQTTException
+import MQTTClient: topic_wildcard_len_check, filter_wildcard_len_check, MQTTException
 import Sockets.TCPSocket
 
 @testset verbose=true "client tests" begin

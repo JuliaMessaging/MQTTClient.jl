@@ -1,4 +1,4 @@
-name = "MQTT"
+name = "MQTTClient"
 uuid = "7b5fea6c-6225-4b7d-8f4a-8782848a6463"
 authors = ["Nick Shindler <nick@shindler.tech>"]
 version = "0.1.0"

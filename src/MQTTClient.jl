@@ -1,4 +1,4 @@
-module MQTT
+module MQTTClient
 
 using Distributed: Future, RemoteChannel
 using Dagger

@@ -20,13 +20,13 @@ end;
 end;
 
 @testset "packet struct" begin
-    p = MQTT.Packet(MQTT.CONNECT, rand(UInt8, 32))
-    @test p.cmd == MQTT.CONNECT
+    p = MQTTClient.Packet(MQTTClient.CONNECT, rand(UInt8, 32))
+    @test p.cmd == MQTTClient.CONNECT
 end
 
 @testset "mqtt distributed channel" begin
-    ch = MQTT.mqtt_channel()
-    a = MQTT.Packet(MQTT.PINGREQ, rand(UInt8, 16))
+    ch = MQTTClient.mqtt_channel()
+    a = MQTTClient.Packet(MQTTClient.PINGREQ, rand(UInt8, 16))
     put!(ch, a)
     b = take!(ch)
     @test a == b
@@ -35,7 +35,7 @@ end
 
 @testset verbose = true "MQTT Client functionality" begin
     @testset "Client" begin
-        c = MQTT.Client(on_msg)
+        c = MQTTClient.Client(on_msg)
         @test c.on_msg === on_msg
         @test c.keep_alive == 0x0000
         @test c.last_id == 0x0000
@@ -47,7 +47,7 @@ end
         @test c.ping_outstanding[] == 0
         # Test custom ping_timeout value
         ping_timeout = UInt64(30)
-        c2 = MQTT.Client(on_msg, ping_timeout)
+        c2 = MQTTClient.Client(on_msg, ping_timeout)
         @test c2.ping_timeout == ping_timeout
         # Test that last_sent and last_received are initialized to NaN
         @test c2.last_sent.value == 0
@@ -55,17 +55,17 @@ end
     end
 
     @testset "MQTT Message" begin
-        msg = MQTT.Message(true, QOS_0, true, "test/mqtt_jl", "testing the MQTT.jl package")
-        @test msg isa MQTT.Message
+        msg = MQTTClient.Message(true, QOS_0, true, "test/mqtt_jl", "testing the MQTTClient.jl package")
+        @test msg isa MQTTClient.Message
 
-        msg = MQTT.Message(false, 0x01, false, "test", "payload")
+        msg = MQTTClient.Message(false, 0x01, false, "test", "payload")
         @test msg.dup == false
         @test msg.qos == 0x01
         @test msg.retain == false
         @test msg.topic == "test"
         @test msg.payload == [UInt8('p'), UInt8('a'), UInt8('y'), UInt8('l'), UInt8('o'), UInt8('a'), UInt8('d')]
 
-        msg = MQTT.Message(MQTT.QOS_2, "test", "payload")
+        msg = MQTTClient.Message(MQTTClient.QOS_2, "test", "payload")
         @test msg.dup == false
         @test msg.qos == 0x02
         @test msg.retain == false
@@ -75,14 +75,14 @@ end
 
 
     @testset "MQTT subscribe async" begin
-        c = MQTT.Client((p,t) -> println(p,t))
-        fut = MQTT.subscribe_async(c, ("test-topic/#", MQTT.QOS_2))
+        c = MQTTClient.Client((p,t) -> println(p,t))
+        fut = MQTTClient.subscribe_async(c, ("test-topic/#", MQTTClient.QOS_2))
         @test fut isa Distributed.Future
     end
 
     @testset "MQTT publish async" begin
-        c = MQTT.Client((p,t) -> println(p,t))
-        fut = MQTT.publish_async(c, "test-topic/mqtt_jl", "test message")
+        c = MQTTClient.Client((p,t) -> println(p,t))
+        fut = MQTTClient.publish_async(c, "test-topic/mqtt_jl", "test message")
         @test fut isa Distributed.Future
     end
 
@@ -102,7 +102,7 @@ end
 
         # Check that the write_packet function was called with the correct arguments
         p = take!(client.write_packets)
-        @test p == MQTT.Packet(MQTT.UNSUBSCRIBE  | 0x02, (0x0002, "topic1"))
+        @test p == MQTTClient.Packet(MQTTClient.UNSUBSCRIBE  | 0x02, (0x0002, "topic1"))
 
         # Call the unsubscribe_async function with multiple topics
         future = unsubscribe_async(client, "topic1", "topic2", "topic3")
@@ -112,61 +112,61 @@ end
 
         # Check that the write_packet function was called with the correct arguments
         p = take!(client.write_packets)
-        @test p == MQTT.Packet(MQTT.UNSUBSCRIBE  | 0x02, (0x0003, "topic1", "topic2", "topic3"))
+        @test p == MQTTClient.Packet(MQTTClient.UNSUBSCRIBE  | 0x02, (0x0003, "topic1", "topic2", "topic3"))
     end
 end
 
 @testset verbose=true "handlers" begin
     @testset "handle_connack" begin
-        c = MQTT.Client(on_msg)
+        c = MQTTClient.Client(on_msg)
         c.in_flight[0x0000] = Future()
 
         # Test successful connection
         io = IOBuffer(UInt8[0x00, 0x00])
-        future = MQTT.handle_connack(c, io, 0x00, 0x00)
+        future = MQTTClient.handle_connack(c, io, 0x00, 0x00)
         @test fetch(future) == 0x00
 
         # Test unsuccessful connection
         io = IOBuffer(UInt8[0x01, 0x01])
         c.in_flight[0x0000] = Future()
-        future = MQTT.handle_connack(c, io, 0x00, 0x00)
+        future = MQTTClient.handle_connack(c, io, 0x00, 0x00)
         @test fetch(future) isa MQTTException
 
         # Test unsuccessful connection
         io = IOBuffer(UInt8[0x01, 0x01])
-        @test_throws ErrorException MQTT.handle_connack(c, io, 0x00, 0x00)
+        @test_throws ErrorException MQTTClient.handle_connack(c, io, 0x00, 0x00)
     end
 
     @testset "handle_publish" begin
-        c = MQTT.Client(on_msg)
+        c = MQTTClient.Client(on_msg)
         # Test QoS 0
         io = IOBuffer(UInt8[0x00, 0x04, 0x74, 0x65, 0x73, 0x74, 0x70, 0x61, 0x79])
-        MQTT.handle_publish(c, io, 0x00, 0x00)
+        MQTTClient.handle_publish(c, io, 0x00, 0x00)
         @test c.on_msg("test", "pay") == ("test", "pay")
 
         # Test QoS 1
         io = IOBuffer(UInt8[0x00, 0x04, 0x74, 0x65, 0x73, 0x74, 0x00, 0x01, 0x70, 0x61])
-        MQTT.handle_publish(c, io, 0x00, 0x02)
+        MQTTClient.handle_publish(c, io, 0x00, 0x02)
         @test c.on_msg("test", "pa") == ("test", "pa")
 
         # Test QoS 2
         io = IOBuffer(UInt8[0x00, 0x04, 0x74, 0x65, 0x73, 0x74, 0x00, 0x01])
-        MQTT.handle_publish(c, io, 0x00, 0x04)
+        MQTTClient.handle_publish(c, io, 0x00, 0x04)
         @test c.on_msg("test", "") == ("test", "")
     end
 
     @testset "handle_ack" begin
-        c = MQTT.Client(on_msg)
+        c = MQTTClient.Client(on_msg)
         c.in_flight[0x0001] = Future()
 
         # Test successful ack
         io = IOBuffer(UInt8[0x00, 0x01])
-        MQTT.handle_ack(c, io, 0x00, 0x00)
+        MQTTClient.handle_ack(c, io, 0x00, 0x00)
         @test !haskey(c.in_flight, 0x0001)
     end
 
     @testset "handle_pubrec" begin
-        c = MQTT.Client(on_msg)
+        c = MQTTClient.Client(on_msg)
         s = IOBuffer()
 
         # Set the cmd and flags values
@@ -178,14 +178,14 @@ end
         seekstart(s)
 
         # Call the handle_pubrec function
-        MQTT.handle_pubrec(c, s, cmd, flags)
+        MQTTClient.handle_pubrec(c, s, cmd, flags)
         p = take!(c.write_packets)
         #!TODO: Figure out why the id changes
-        @test p == MQTT.Packet(MQTT.PUBREL  | 0x02, (0x0300,))
+        @test p == MQTTClient.Packet(MQTTClient.PUBREL  | 0x02, (0x0300,))
     end
 
     @testset "handle_pubrel" begin
-        c = MQTT.Client(on_msg)
+        c = MQTTClient.Client(on_msg)
         s = IOBuffer()
 
         # Set the cmd and flags values
@@ -197,13 +197,13 @@ end
         seekstart(s)
 
         # Call the handle_pubrel function
-        MQTT.handle_pubrel(c, s, cmd, flags)
+        MQTTClient.handle_pubrel(c, s, cmd, flags)
         p = take!(c.write_packets)
-        @test p == MQTT.Packet(MQTT.PUBCOMP, (0x0100,))
+        @test p == MQTTClient.Packet(MQTTClient.PUBCOMP, (0x0100,))
     end
 
     @testset "handle_suback" begin
-        c = MQTT.Client(on_msg)
+        c = MQTTClient.Client(on_msg)
         s = IOBuffer()
 
         # Set the cmd and flags values
@@ -218,7 +218,7 @@ end
         c.in_flight[0x0100] = Future()
 
         # Call the handle_suback function
-        MQTT.handle_suback(c, s, cmd, flags)
+        MQTTClient.handle_suback(c, s, cmd, flags)
 
         # Check that the in_flight dictionary was updated correctly
         future = c.in_flight[0x0100]
@@ -226,7 +226,7 @@ end
     end
 
     @testset "handle_pingresp" begin
-        c = MQTT.Client(on_msg)
+        c = MQTTClient.Client(on_msg)
         s = IOBuffer()
 
         # Set the cmd and flags values
@@ -237,16 +237,16 @@ end
         c.ping_outstanding[] = 0x1
 
         # Call the handle_pingresp function
-        MQTT.handle_pingresp(c, s, cmd, flags)
+        MQTTClient.handle_pingresp(c, s, cmd, flags)
 
         # Check that the ping_outstanding value was updated correctly
         @test c.ping_outstanding[] == 0x0
 
         # Set the ping_outstanding value to 0x0 and call the handle_pingresp function again
         c.ping_outstanding[] = 0x0
-        MQTT.handle_pingresp(c, s, cmd, flags)
+        MQTTClient.handle_pingresp(c, s, cmd, flags)
         p = take!(c.write_packets)
-        @test p == MQTT.Packet(MQTT.DISCONNECT, ())
+        @test p == MQTTClient.Packet(MQTTClient.DISCONNECT, ())
     end
 
 end
