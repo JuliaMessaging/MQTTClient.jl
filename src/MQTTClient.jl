@@ -16,6 +16,7 @@ include("interface.jl")
 
 export
     Client,
+    MQTTConnection,
     User,
     QOS_0,
     QOS_1,

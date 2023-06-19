@@ -172,7 +172,7 @@ Client(on_msg, 30)
 ```
 """
 mutable struct Client
-    on_msg::Function
+    on_msg::Dict{String,Function}
     keep_alive::UInt16
 
     # TODO mutex?
@@ -190,8 +190,8 @@ mutable struct Client
     last_sent::Atomic{Float64}
     last_received::Atomic{Float64}
 
-    Client(on_msg::Function) = new(
-            on_msg,
+    Client() = new(
+            Dict{String,Function}(),
             0x0000,
             0x0000,
             Dict{UInt16, Future}(),
@@ -203,8 +203,8 @@ mutable struct Client
             Atomic{Float64}(),
             Atomic{Float64}())
 
-    Client(on_msg::Function, ping_timeout::UInt64) = new(
-            on_msg,
+    Client(ping_timeout::UInt64) = new(
+            Dict{String,Function}(),
             0x0000,
             0x0000,
             Dict{UInt16, Future}(),

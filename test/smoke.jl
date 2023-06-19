@@ -24,7 +24,7 @@ try
             notify(condition)
         end
 
-        client = Client(on_msg)
+        client = Client()
         println(client)
 
         println("Testing reconnect")
@@ -35,7 +35,7 @@ try
         connect(client, MQTT_BROKER, MQTT_PORT)
         sleep(0.5)
 
-        @time subscribe(client, (topic, QOS_2))
+        @time subscribe(client, topic, on_msg, qos=QOS_2)
 
         println("Testing publish qos 0")
         publish(client, topic, payload, qos=QOS_0)

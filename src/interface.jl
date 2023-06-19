@@ -1,5 +1,5 @@
 """
-    MQTTClient(on_msg::Function)
+    MQTTConnection(on_msg::Function)
 
 Create a new `Client` object with the specified `on_msg` function.
 
@@ -8,12 +8,10 @@ Create a new `Client` object with the specified `on_msg` function.
 
 # Examples
 ```julia
-client = MQTTClient(on_msg)
+client = MQTTConnection(on_msg)
 ```
 """
-function MQTTClient(on_msg::Function)
-    Client(on_msg::Function)
-end
+MQTTConnection(;ping_timeout=UInt64(60)) = Client(ping_timeout)
 
 """
     connect_async(client::Client, host::AbstractString, port::Integer=1883;
@@ -140,25 +138,36 @@ function disconnect(client::Client)
     #wait(client.socket.closenotify)
 end
 
+function subscribe_async(client, topic, on_msg; qos=QOS_0)
+    future = Future()
+    id = packet_id(client)
+    client.in_flight[id] = future
+    write_packet(client, SUBSCRIBE | 0x02, id, topic, qos)
+    client.on_msg[topic] = on_msg
+    return future
+end
+
+subscribe(client, topic, on_msg; qos=QOS_0) = resolve(subscribe_async(client, topic, on_msg, qos=qos))
+
 """
     subscribe_async(client::Client, topics::Tuple{String, QOS}...)
 
 Subscribes the `Client` instance to the supplied topic tuples.
 Returns a `Future` object that contains the actually received QOS levels for each topic on success. Contains an exception on failure
 """
-function subscribe_async(client::Client, topics::Tuple{String, QOS}...)
-    future = Future()
-    id = packet_id(client)
-    client.in_flight[id] = future
-    topic_data = []
-    for t in topics
-        for data in t
-            push!(topic_data, data)
-        end
-    end
-    write_packet(client, SUBSCRIBE | 0x02, id, topic_data...)
-    return future
-end
+# function subscribe_async(client::Client, topics::Tuple{String, QOS}...)
+#     future = Future()
+#     id = packet_id(client)
+#     client.in_flight[id] = future
+#     topic_data = []
+#     for t in topics
+#         for data in t
+#             push!(topic_data, data)
+#         end
+#     end
+#     write_packet(client, SUBSCRIBE | 0x02, id, topic_data...)
+#     return future
+# end
 
 """
     subscribe(client::Client, topics::Tuple{String, QOS}...)
@@ -166,10 +175,10 @@ end
 Waits until the subscribe is fully acknowledged. Returns the actually received QOS levels for each topic on success. 
 Contains an exception on failure.
 """
-function subscribe(client::Client, topics::Tuple{String, QOS}...)
-    v = fetch(subscribe_async(client, topics...))
-    v
-end
+# function subscribe(client::Client, topics::Tuple{String, QOS}...)
+#     v = fetch(subscribe_async(client, topics...))
+#     v
+# end
 
 """
     unsubscribe_async(client::Client, topics::String...)
@@ -183,6 +192,7 @@ function unsubscribe_async(client::Client, topics::String...)
     client.in_flight[id] = future
     topic_data = []
     write_packet(client, UNSUBSCRIBE | 0x02, id, topics...)
+    ((t) -> delete!(client.on_msg, t)).(topics)
     return future
 end
 
