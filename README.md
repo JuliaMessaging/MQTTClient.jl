@@ -57,7 +57,7 @@ Pkg.clone("https://github.com/NickMcSweeney/MQTTClient.jl.git")
 Testing
 -------
 ```julia
-Pkg.test("MQTT")
+Pkg.test("MQTTClient")
 ```
 Usage
 -----
@@ -65,8 +65,19 @@ Import the library with the `using` keyword.
 
 Samples are available in the `examples` directory.
 ```julia
-using MQTT
+using MQTTClient
 ```
+
+Advanced Usage
+--------------
+True multi-threading is available via Dagger.jl and will be enabled if Julia is run with more than 1 thread enabled.
+
+```bash
+julia -t 2
+```
+The _read_loop_, _write_loop_ _keep_alive_loop_, and _on_msg_ callback are all called as scheduled processes via `Dagger.@spawn` rather than `@async`. 
+This is work in progress, so it is not 100% stable. 
+Also based on testing, for simple/low load networks it is slower to run it threaded than to run async (probably because there is more overhead managing threads).
 
 ## Getting started
 To use this library you need to follow at least these steps:
@@ -80,7 +91,7 @@ To use this library you need to follow at least these steps:
 Refer to the corresponding method documentation to find more options.
 
 ```julia
-using MQTT
+using MQTTClient
 broker = "test.mosquitto.org"
 
 #Define the callback for receiving messages.
@@ -341,21 +352,17 @@ This package's development is sponsored by [MapXact](mapxact.com/) and used in p
 
 ### TODO
 
-* Add documentation with documenter
-* Review unit tests
-    * fix tests so that they actually work
-* Review examples
-* protocol error handling
-* reconnect
-* persistence (in memory, files)
-* start documentation
-* look at enums and how to use them
-* qos2 
+- [ ] Review examples
+- [ ] protocol error handling
+- [ ] reconnect
+- [ ] persistence (in memory, files)
+- [ ] look at enums and how to use them
+- [ ] qos2 
     * separate handle_pubrecrel into two different methods and fix them
-* fix connect method
+- [ ] fix connect method
     * make it not hardcoded
-* disconnect_async/disconnect
+- [ ] disconnect_async/disconnect
     * think about what we need to do and how
     * the reconnect should still work
-* put handle methods to other file
-* implement clean session = false
+- [ ] put handle methods to other file
+- [ ] implement clean session = false
