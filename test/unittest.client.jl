@@ -25,7 +25,7 @@ end;
 end
 
 @testset "mqtt distributed channel" begin
-    ch = MQTTClient.mqtt_channel()
+    ch = MQTTClient.@mqtt_channel
     a = MQTTClient.Packet(MQTTClient.PINGREQ, rand(UInt8, 16))
     put!(ch, a)
     b = take!(ch)
@@ -40,7 +40,7 @@ end
         @test c.keep_alive == 0x0000
         @test c.last_id == 0x0000
         @test isempty(c.in_flight)
-        @test c.write_packets isa RemoteChannel
+        @test c.write_packets isa AbstractChannel
         @test c.socket isa TCPSocket
         @test c.socket_lock isa ReentrantLock
         @test c.ping_timeout == 60

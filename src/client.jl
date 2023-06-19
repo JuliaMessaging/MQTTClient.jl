@@ -27,18 +27,6 @@ const CONNECTION_REFUSED_SERVER_UNAVAILABLE = 0x03
 const CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD = 0x04
 const CONNECTION_REFUSED_NOT_AUTHORIZED = 0x05
 
-macro dispatch(arg)
-    if Threads.nthreads() > 1
-        quote
-            Dagger.@spawn $arg
-        end
-    else
-        quote
-            @async $arg
-        end
-    end
-end
-
 """
     struct MQTTException <: Exception
         msg::AbstractString
@@ -148,7 +136,7 @@ A mutable struct that represents an MQTT client.
 - `keep_alive::UInt16`: The number of seconds between pings.
 - `last_id::UInt16`: The last message ID used.
 - `in_flight::Dict{UInt16, Future}`: A dictionary of messages that are waiting for a response.
-- `write_packets::RemoteChannel`: A channel for writing packets to the socket.
+- `write_packets::AbstractChannel`: A channel for writing packets to the socket.
 - `socket`: The socket used for communication.
 - `socket_lock`: A lock for the socket.
 - `ping_timeout::UInt64`: The number of seconds to wait for a ping response before disconnecting.
@@ -173,7 +161,7 @@ mutable struct Client
     last_id::UInt16
     in_flight::Dict{UInt16, Future}
 
-    write_packets::RemoteChannel
+    write_packets::AbstractChannel
     socket
     socket_lock # TODO add type
 
@@ -185,30 +173,30 @@ mutable struct Client
     last_received::Atomic{Float64}
 
     Client(on_msg::Function) = new(
-                                   on_msg,
-                                   0x0000,
-                                   0x0000,
-                                   Dict{UInt16, Future}(),
-                                   mqtt_channel(),
-                                   TCPSocket(),
-                                   ReentrantLock(),
-                                   60,
-                                   Atomic{UInt8}(0),
-                                   Atomic{Float64}(),
-                                   Atomic{Float64}())
+            on_msg,
+            0x0000,
+            0x0000,
+            Dict{UInt16, Future}(),
+            (@mqtt_channel),
+            TCPSocket(),
+            ReentrantLock(),
+            60,
+            Atomic{UInt8}(0),
+            Atomic{Float64}(),
+            Atomic{Float64}())
 
     Client(on_msg::Function, ping_timeout::UInt64) = new(
-                                                         on_msg,
-                                                         0x0000,
-                                                         0x0000,
-                                                         Dict{UInt16, Future}(),
-                                                         mqtt_channel(),
-                                                         TCPSocket(),
-                                                         ReentrantLock(),
-                                                         ping_timeout,
-                                                         Atomic{UInt8}(0),
-                                                         Atomic{Float64}(),
-                                                         Atomic{Float64}())
+            on_msg,
+            0x0000,
+            0x0000,
+            Dict{UInt16, Future}(),
+            (@mqtt_channel),
+            TCPSocket(),
+            ReentrantLock(),
+            ping_timeout,
+            Atomic{UInt8}(0),
+            Atomic{Float64}(),
+            Atomic{Float64}())
 end
 
 
@@ -501,25 +489,29 @@ Returns a `Future` object that contains a session_present bit from the broker on
 - `clean_session::Bool=true`: Flag to resume a session with the broker if present.
 """
 function connect_async(client::Client, host::AbstractString, port::Integer=1883;
-                       keep_alive::Int64=0,
+                       keep_alive::Int64=10,
                        client_id::String=randstring(8),
                        user::User=User("", ""),
-                       will::Message=Message(false, 0x00, false, "", Array{UInt8}()),
+                       will::Message=Message(false, 0x00, false, "", UInt8[]),
                        clean_session::Bool=true)
 
-    client.write_packets = mqtt_channel()
+    client.write_packets = @mqtt_channel
     try
         client.keep_alive = convert(UInt16, keep_alive)
     catch
         error("Could not convert keep_alive to UInt16")
     end
     client.socket = connect(host, port)
+    @debug "connect to host"
     @dispatch write_loop(client)
     @dispatch read_loop(client)
+    @debug "set backround procs"
 
     if client.keep_alive > 0x0000
         @dispatch keep_alive_loop(client)
     end
+
+    @debug "set keep alive"
 
     #TODO reset client on clean_session = true
 
@@ -527,8 +519,10 @@ function connect_async(client::Client, host::AbstractString, port::Integer=1883;
     protocol_level = 0x04
     connect_flags = 0x02 # clean session
 
-    optional_user = ()
-    optional_will = ()
+    @debug "set protocol"
+
+    local optional_user = ()
+    local optional_will = ()
 
     if length(user.name) > 0 && length(user.password) > 0
         connect_flags |= 0xC0
@@ -543,6 +537,8 @@ function connect_async(client::Client, host::AbstractString, port::Integer=1883;
         connect_flags |= 0x04 | ((will.qos & 0x03) << 3) | ((will.retain & 0x01) << 5)
     end
 
+    @debug "set optional fields"
+
     future = Future()
     client.in_flight[0x0000] = future
 
@@ -554,6 +550,8 @@ function connect_async(client::Client, host::AbstractString, port::Integer=1883;
                  client_id,
                  optional_user...,
                  optional_will...)
+
+    @debug "write packets"
 
     return future
 end
@@ -581,7 +579,7 @@ connect(client::Client, host::AbstractString, port::Integer=1883;
         client_id::String=randstring(8),
         user::User=User("", ""),
         will::Message=Message(false, 0x00, false, "", UInt8[]),
-        clean_session::Bool=true) = fetch(connect_async(client, host, port, keep_alive=keep_alive, client_id=client_id, user=user, will=will, clean_session=clean_session))
+        clean_session::Bool=true) = resolve(connect_async(client, host, port, keep_alive=keep_alive, client_id=client_id, user=user, will=will, clean_session=clean_session))
 
 
 """
@@ -649,7 +647,7 @@ end
 Unsubscribes the `Client` instance from the supplied topic names.
 Waits until the unsubscribe is fully acknowledged. Returns `nothing` on success and an exception on failure.
 """
-unsubscribe(client::Client, topics::String...) = fetch(unsubscribe_async(client, topics...))
+unsubscribe(client::Client, topics::String...) = resolve(unsubscribe_async(client, topics...))
 
 """
    publish_async(client::Client, message::Message)
@@ -699,7 +697,7 @@ publish_async(client::Client, topic::String, payload...;
  publish(client::Client, topic::String, payload...;
          dup::Bool=false,
          qos::QOS=QOS_0,
-         retain::Bool=false) = fetch(publish_async(client, topic, payload..., dup=dup, qos=qos, retain=retain))
+         retain::Bool=false) = resolve(publish_async(client, topic, payload..., dup=dup, qos=qos, retain=retain))
 
  # Helper method to check if it is possible to subscribe to a topic
  function filter_wildcard_len_check(sub)

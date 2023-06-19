@@ -1,3 +1,21 @@
+# macro dispatch(arg)
+#     return Threads.nthreads() > 1 ? :(Dagger.spawn($arg)) : :(schedule(Task(() -> $arg)))
+# end
+
+macro dispatch(ex)
+    if Threads.nthreads() == 1
+        return :(@async $(esc(ex)))
+    elseif Threads.nthreads() > 1
+        return :(Dagger.@spawn $(esc(ex)))
+    else
+        return :(throw(Exception("Threads are not valid")))
+    end
+end
+
+macro mqtt_channel(len::Number=128)
+    return Threads.nthreads() > 1 ? :(RemoteChannel(()->Channel{Packet}($len))) : :(Channel{Packet}($len))
+end
+
 mqtt_read(s::IO, ::Type{UInt16}) = ntoh(read(s, UInt16))
 
 function mqtt_read(s::IO, ::Type{String})
@@ -49,7 +67,12 @@ function read_len(s::IO)
     return value
 end
 
-function mqtt_channel(len::Int) 
-    RemoteChannel(()->Channel{Packet}(len))
+# the docs make it sound like fetch would alrdy work in this way
+# check julia sources
+function resolve(future)
+    r = fetch(future)
+    if typeof(r) <: Exception
+        throw(r)
+    end
+    return r
 end
-mqtt_channel() = mqtt_channel(60)

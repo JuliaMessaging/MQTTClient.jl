@@ -6,7 +6,7 @@ using Sockets: TCPSocket
 import Sockets: connect
 using Random: randstring
 import Base: ReentrantLock, lock, unlock, convert
-using Base.Threads, Dates
+using Base.Threads
 
 include("utils.jl")
 include("client.jl")
