@@ -3,11 +3,6 @@ import MQTTClient.User
 const MQTT_BROKER = "test.mosquitto.org"
 const MQTT_PORT = 1883
 
-println("ENV Vars: ")
-for (k,v) in ENV
-    println("$k => $v")
-end
-
 try
     s = connect(MQTT_BROKER, MQTT_PORT)
     close(s)
