@@ -1,14 +1,15 @@
 """
-    MQTTConnection(on_msg::Function)
+    MQTTConnection(;ping_timeout=UInt64(60))
 
-Create a new `Client` object with the specified `on_msg` function.
+Create a new `Client` object with the specified `ping_timeout` (optional).
 
-# Arguments
-- `on_msg::Function`: The function to be called when a message is received.
+# Keyword Arguments
+- `ping_timeout::UInt64=60`: The number of seconds to wait for a ping response before disconnecting. Default is 60.
 
 # Examples
 ```julia
-client = MQTTConnection(on_msg)
+client = MQTTConnection()
+client = MQTTConnection(ping_timeout=30)
 ```
 """
 MQTTConnection(;ping_timeout=UInt64(60)) = Client(ping_timeout)
@@ -138,6 +139,25 @@ function disconnect(client::Client)
     #wait(client.socket.closenotify)
 end
 
+"""
+    subscribe_async(client::Client, topic::String, on_msg::Function; qos::UInt8=QOS_0)
+
+Subscribe to a topic asynchronously.
+
+# Arguments
+- `client::Client`: The MQTT client.
+- `topic::String`: The topic to subscribe to.
+- `on_msg::Function`: The function to call when a message is received on the topic.
+- `qos::UInt8`: The quality of service level to use for the subscription. Default is 0.
+
+# Returns
+- `Future`: A future that can be used to wait for the subscription to complete.
+
+# Examples
+```julia
+future = subscribe_async(client, "my/topic", on_msg, qos=QOS_2)
+```
+"""
 function subscribe_async(client, topic, on_msg; qos=QOS_0)
     future = Future()
     id = packet_id(client)
@@ -147,43 +167,30 @@ function subscribe_async(client, topic, on_msg; qos=QOS_0)
     return future
 end
 
+"""
+    subscribe(client::Client, topic::String, on_msg::Function; qos::UInt8=QOS_0)
+
+Subscribe to a topic.
+
+# Arguments
+- `client::Client`: The MQTT client.
+- `topic::String`: The topic to subscribe to.
+- `on_msg::Function`: The function to call when a message is received on the topic.
+- `qos::UInt8`: The quality of service level to use for the subscription. Default is 0.
+
+# Examples
+```julia
+subscribe(client, "my/topic", on_msg)
+```
+"""
 subscribe(client, topic, on_msg; qos=QOS_0) = resolve(subscribe_async(client, topic, on_msg, qos=qos))
 
-"""
-    subscribe_async(client::Client, topics::Tuple{String, QOS}...)
-
-Subscribes the `Client` instance to the supplied topic tuples.
-Returns a `Future` object that contains the actually received QOS levels for each topic on success. Contains an exception on failure
-"""
-# function subscribe_async(client::Client, topics::Tuple{String, QOS}...)
-#     future = Future()
-#     id = packet_id(client)
-#     client.in_flight[id] = future
-#     topic_data = []
-#     for t in topics
-#         for data in t
-#             push!(topic_data, data)
-#         end
-#     end
-#     write_packet(client, SUBSCRIBE | 0x02, id, topic_data...)
-#     return future
-# end
-
-"""
-    subscribe(client::Client, topics::Tuple{String, QOS}...)
-
-Waits until the subscribe is fully acknowledged. Returns the actually received QOS levels for each topic on success. 
-Contains an exception on failure.
-"""
-# function subscribe(client::Client, topics::Tuple{String, QOS}...)
-#     v = fetch(subscribe_async(client, topics...))
-#     v
-# end
 
 """
     unsubscribe_async(client::Client, topics::String...)
 
 Unsubscribes the `Client` instance from the supplied topic names.
+Deletes the callback from the client
 Returns a `Future` object that contains `nothing` on success and an exception on failure. 
 """
 function unsubscribe_async(client::Client, topics::String...)

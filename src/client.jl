@@ -141,16 +141,15 @@ struct User
 end
 
 """
-    Client(on_msg::Function[, ping_timeout::UInt64])
+    Client([ping_timeout::UInt64])
 
 A mutable struct that represents an MQTT client.
 
 # Arguments
-- `on_msg::Function`: A function that will be called when a message is received.
 - `ping_timeout::UInt64`: The number of seconds to wait for a ping response before disconnecting. Default is 60.
 
 # Fields
-- `on_msg::Function`: The function that will be called when a message is received.
+- `on_msg::Dict{String,Function}`: A dictionary of functions that will be called when a message is received.
 - `keep_alive::UInt16`: The number of seconds between pings.
 - `last_id::UInt16`: The last message ID used.
 - `in_flight::Dict{UInt16, Future}`: A dictionary of messages that are waiting for a response.
@@ -164,11 +163,7 @@ A mutable struct that represents an MQTT client.
 
 # Examples
 ```julia
-julia> client = Client(on_msg)
-Client(on_msg, 60)
-
-julia> client = Client(on_msg, 30)
-Client(on_msg, 30)
+julia> client = Client()
 ```
 """
 mutable struct Client
