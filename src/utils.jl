@@ -111,3 +111,21 @@ function resolve(future)
     end
     return r
 end
+
+ # Helper method to check if it is possible to subscribe to a topic
+ function filter_wildcard_len_check(sub)
+     #Regex: matches any valid topic, + and # are not in allowed in strings, + is only allowed as a single symbol between two /, # is only allowed at the end
+     if !(occursin(r"(^[^#+]+|[+])(/([^#+]+|[+]))*(/#)?$", sub)) || length(sub) > 65535
+         throw(MQTTException("Invalid topic"))
+     end
+ end
+
+ # Helper method to check if it is possible to publish a topic
+ function topic_wildcard_len_check(topic)
+     # Search for + or # in a topic. Return MQTT_ERR_INVAL if found.
+     # Also returns MQTT_ERR_INVAL if the topic string is too long.
+     # Returns MQTT_ERR_SUCCESS if everything is fine.
+     if !(occursin(r"^[^#+]+$", topic)) || length(topic) > 65535
+         throw(MQTTException("Invalid topic"))
+     end
+ end

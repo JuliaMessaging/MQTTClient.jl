@@ -364,5 +364,4 @@ This package's development is sponsored by [MapXact](mapxact.com/) and used in p
 - [ ] disconnect_async/disconnect
     * think about what we need to do and how
     * the reconnect should still work
-- [ ] put handle methods to other file
 - [ ] implement clean session = false

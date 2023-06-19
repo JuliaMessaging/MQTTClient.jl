@@ -10,6 +10,8 @@ using Base.Threads
 
 include("utils.jl")
 include("client.jl")
+include("handlers.jl")
+include("interface.jl")
 # include("precompile.jl")
 
 export
