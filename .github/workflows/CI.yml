@@ -65,6 +65,6 @@ jobs:
       - run: |
           julia --project=docs -e '
             using Documenter: DocMeta, doctest
-            using MQTT
-            DocMeta.setdocmeta!(MQTT, :DocTestSetup, :(using MQTT); recursive=true)
-            doctest(MQTT)'
+            using MQTTClient
+            DocMeta.setdocmeta!(MQTTClient, :DocTestSetup, :(using MQTTClient); recursive=true)
+            doctest(MQTTClient)'
