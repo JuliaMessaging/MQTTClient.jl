@@ -81,10 +81,10 @@ Also based on testing, for simple/low load networks it is slower to run it threa
 
 ## Getting started
 To use this library you need to follow at least these steps:
-1. Define an `on_msg` callback function.
-2. Create an instance of the `Client` struct and pass it your `on_msg` function.
+1. Define an `on_msg` callback function for a given topic.
+2. Create an instance of the `Client` struct.
 3. Call the connect method with your `Client` instance.
-4. Exchange data with the broker through publish, subscribe and unsubscribe.
+4. Exchange data with the broker through publish, subscribe and unsubscribe. When subscribing, pass your `on_msg` function for that topic.
 5. Disconnect from the broker. (Not strictly necessary, if you don't want to resume the session but considered good form and less likely to crash).
 
 #### Basic example
@@ -100,13 +100,13 @@ function on_msg(topic, payload)
 end
 
 #Instantiate a client.
-client = Client(on_msg)
-connect(client, broker)
+client = Client()
+connect(client, broker, 1883)
 #Set retain to true so we can receive a message from the broker once we subscribe
 #to this topic.
 publish(client, "jlExample", "Hello World!", retain=true)
 #Subscribe to the topic we sent a retained message to.
-subscribe(client, ("jlExample", QOS_1))
+subscribe(client, "jlExample", on_msg, qos=QOS_1))
 #Unsubscribe from the topic
 unsubscribe(client, "jlExample")
 #Disconnect from the broker. Not strictly needed as the broker will also
@@ -127,15 +127,19 @@ The client struct is used to store state for an MQTT connection. All callbacks, 
 * **on_unsubscribe**::Function:
 
 ##### Constructors
-All constructors take the `on_message` callback as an argument.
 
 ```julia
-Client(on_msg::Function)
+Client()
 ```
 
 Specify a custom ping_timeout
 ```julia
-Client(on_msg::Function, ping_timeout::UInt64)
+Client(ping_timeout::UInt64 = 10)
+```
+
+Use the wrapping function. this is equivalent to using the Client constructor; but with more specific syntax.
+```julia
+MQTTConnection()
 ```
 
 ## Message struct
@@ -265,26 +269,28 @@ Subscribes the `Client` instance, provided as a parameter, to the specified topi
 #### Arguments
 **Required arguments:**
 * **client**::Client: The connected client to subscribe on. TODO phrasing?
-* **topics**::Tuple{String, QOS}...: A variable amount of tuples that each have a String and a QOS constant.
+* **topic**::String: The name of the topic.
+* **on_msg**::Function: the callback function for that topic.
+* **qos**::QOS: the named argument to set the QOS, defaults to QOS_0.
 
 #### Call example
 This example subscribes to the topic "test" with QOS_2 and "test2" with QOS_0.
 ```julia
-subscribe(c, ("test", QOS_2), ("test2", QOS_0))
+subscribe(c, "test", ((t,p)->do_a_thing(p)), qos=QOS_2))
 ```
 
 #### Synchronous subscribe
 This method waits until the subscribe message has been successfully sent and acknowledged. TODO add return documentation
 
 ```julia
-function subscribe(client, topics::Tuple{String, QOS}...)
+subscribe(c, "test", on_msg, qos=QOS_2))
 ```
 
 #### Asynchronous subscribe
 This method doesn't wait and returns a `Future` object. You may choose to wait on this object. This future completes once the subscribe message has been successfully sent and acknowledged. TODO change future data documentation
 
 ```julia
-function subscribe_async(client, topics::Tuple{String, QOS}...)
+function subscribe_async(c, "test", on_msg, qos=QOS_2))
 ```
 
 ## Unsubscribe
