@@ -13,12 +13,13 @@ try
         condition = Condition()
         topic = "foo"
         payload = Random.randstring(20)
+        client_test_res = Channel{Bool}(32)
 
         function on_msg(t, p)
             msg = p |> String
             println("Received message topic: [", t, "] payload: [", msg, "]")
-            @test t == topic
-            @test msg == payload
+            put!(client_test_res, t == topic)
+            put!(client_test_res, msg == payload)
 
             notify(condition)
         end
@@ -66,6 +67,10 @@ try
 
         @test isopen(client.socket)
         disconnect(client)
+
+        while !isempty(client_test_res)
+            @test take!(client_test_res)
+        end
     end
 catch e
     println("$MQTT_BROKER:$MQTT_PORT not online -- skipping smoke test")
