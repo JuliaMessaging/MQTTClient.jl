@@ -41,6 +41,11 @@ const CONNACK_ERRORS = Dict{UInt8, String}(
       QOS_1 = 0x01,
       QOS_2 = 0x02)
 
+# connection values
+@enum(CONN::UInt8,
+      TCP = 0x00, # transmission control protocol
+      UDS = 0x01) # unix domain socket
+
 
 ## Structs
 ## -------
@@ -141,12 +146,77 @@ struct User
 end
 
 """
+    AbstractConnection
+
+    Base Connection type
+"""
+abstract type AbstractConnection end
+
+"""
+    TCPConnection(host::AbstractString, port::Integer)
+
+    A struct that represents a transport control protocol socket connection.
+
+# Examples
+```julia
+julia> conn = TCPConnection("localhost", 1883)
+TCPConnection(MQTTClient.TCP, "localhost", 1883)
+```
+"""
+mutable struct TCPConnection <: AbstractConnection
+
+    type::CONN
+    host::String
+    port::Int
+
+    TCPConnection() = new(
+        TCP,
+        "localhost",
+        8883
+       )
+    
+    TCPConnection(host::AbstractString, port::Int) = new(
+        TCP,
+        host,
+        port
+       )
+end
+
+"""
+    UDSConnection(host::AbstractString, port::Integer)
+
+    A struct that represents a unix domain socket connection.
+
+# Examples
+```julia
+julia> conn = UDSConnection("/tmp/mqtt/mqtt.sock")
+UDSConnection(MQTTClient.UDS, "/tmp/mqtt/mqtt.sock")
+```
+"""
+mutable struct UDSConnection <: AbstractConnection
+    type::CONN
+    path::String
+
+    UDSConnection() = new(
+        UDS,
+        pwd()
+       )
+    
+    UDSConnection(path::AbstractString) = new(
+        UDS,
+        path
+       )
+
+end
+
+"""
     Client([ping_timeout::UInt64])
 
 A mutable struct that represents an MQTT client.
 
 # Arguments
 - `ping_timeout::UInt64`: The number of seconds to wait for a ping response before disconnecting. Default is 60.
+- `path::AbstractString`: The path to the unix domain socket created by the broker.
 
 # Fields
 - `on_msg::Dict{String,Function}`: A dictionary of functions that will be called when a message is received.
@@ -164,9 +234,11 @@ A mutable struct that represents an MQTT client.
 # Examples
 ```julia
 julia> client = Client()
+julia> client = Client("/tmp/mqtt/mqtt.sock")
 ```
 """
 mutable struct Client
+
     on_msg::Dict{String,Function}
     keep_alive::UInt16
 
@@ -205,6 +277,19 @@ mutable struct Client
             Dict{UInt16, Future}(),
             (@mqtt_channel),
             TCPSocket(),
+            ReentrantLock(),
+            ping_timeout,
+            Atomic{UInt8}(0),
+            Atomic{Float64}(),
+            Atomic{Float64}())
+    
+    Client(path::AbstractString, ping_timeout::UInt64 = UInt64(60)) = new(
+            Dict{String,Function}(),
+            0x0000,
+            0x0000,
+            Dict{UInt16, Future}(),
+            (@mqtt_channel),
+            PipeServer(),
             ReentrantLock(),
             ping_timeout,
             Atomic{UInt8}(0),
