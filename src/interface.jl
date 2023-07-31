@@ -6,6 +6,9 @@ Create a new `Client` object with the specified `host` and optional keyword argu
 # Arguments
 - `host::IPAddr`: The IP address of the MQTT broker.
 
+# Arguments
+- `path::AbstractString`: The path to the unix domain socket created by the broker on the filesystem
+
 # Keyword Arguments
 - `ping_timeout::UInt64=60`: The number of seconds to wait for a ping response before disconnecting. Default is 60.
 - `port::Int=1883`: The port number to connect to. Default is 1883.
@@ -25,6 +28,10 @@ client = MQTTConnection(host, port=8883, user=User("foo", "bar"))
 
 host = Sockets.localhost
 client = MQTTConnection(host, port=5000, keep_alive=10)
+
+client = MQTTConnection()
+client = MQTTConnection(ping_timeout=30)
+client = MQTTConnection("/tmp/mqtt/mqtt.sock")
 ```
 """
 function MQTTConnection(host::IPAddr;
@@ -39,9 +46,11 @@ function MQTTConnection(host::IPAddr;
     resolve(connect_async(client, "$host", port, keep_alive=keep_alive, client_id=client_id, user=user, will=will, clean_session=clean_session))
     return client
 end
+MQTTConnection(;ping_timeout=UInt64(60)) = Client(ping_timeout)
+MQTTConnection(path::AbstractString) = Client(path)
 
 """
-    connect_async(client::Client, host::AbstractString, port::Integer=1883;
+    connect_async(client::Client, conn::AbstractConnection;
        keep_alive::UInt16=0x0000,
        client_id::String=randstring(8),
        user::User=User("", ""),
@@ -58,7 +67,7 @@ Returns a `Future` object that contains a session_present bit from the broker on
 - `will::Message=Message(false, 0x00, false, "", Array{UInt8}())`: The MQTT will to send to all other clients when this client disconnects.  
 - `clean_session::Bool=true`: Flag to resume a session with the broker if present.
 """
-function connect_async(client::Client, host::AbstractString, port::Integer=1883;
+function connect_async(client::Client, conn::AbstractConnection;
                        keep_alive::Int64=10,
                        client_id::String=randstring(8),
                        user::User=User("", ""),
@@ -71,14 +80,22 @@ function connect_async(client::Client, host::AbstractString, port::Integer=1883;
     catch
         error("Could not convert keep_alive to UInt16")
     end
-    client.socket = connect(host, port)
+
+    if conn.type == UDS
+        # Sockets.jl will choose unix socket and return PipeServer()
+        client.socket = connect(conn.path)
+    else
+        # Sockets.jl will choose tcp socket and return TCPSocket()
+        client.socket = connect(conn.host, conn.port)
+    end
+
     @debug "connect to host"
-    @dispatch write_loop(client)
-    @dispatch read_loop(client)
+    @async write_loop(client)
+    @async read_loop(client)
     @debug "set backround procs"
 
     if client.keep_alive > 0x0000
-        @dispatch keep_alive_loop(client)
+        @async keep_alive_loop(client)
     end
 
     @debug "set keep alive"
@@ -86,7 +103,7 @@ function connect_async(client::Client, host::AbstractString, port::Integer=1883;
     #TODO reset client on clean_session = true
 
     protocol_name = "MQTT"
-    protocol_level = 0x04
+    protocol_level = 0x04 # v3.1.1
     connect_flags = 0x02 # clean session
 
     @debug "set protocol"
@@ -127,7 +144,7 @@ function connect_async(client::Client, host::AbstractString, port::Integer=1883;
 end
 
 """
-    connect(client::Client, host::AbstractString, port::Integer=1883;
+    connect(client::Client, conn::AbstractConnection;
         keep_alive::UInt16=0x0000,
         client_id::String=randstring(8),
         user::User=User("", ""),
@@ -144,12 +161,13 @@ Waits until the connect is done. Returns the session_present bit from the broker
 - `will::Message=Message(false, 0x00, false, "", Array{UInt8}())`: The MQTT will to send to all other clients when this client disconnects.  
 - `clean_session::Bool=true`: Flag to resume a session with the broker if present.
 """
-connect(client::Client, host::AbstractString, port::Integer=1883;
+
+connect(client::Client, conn::AbstractConnection;
         keep_alive::Int64=0,
         client_id::String=randstring(8),
         user::User=User("", ""),
         will::Message=Message(false, 0x00, false, "", UInt8[]),
-        clean_session::Bool=true) = resolve(connect_async(client, host, port, keep_alive=keep_alive, client_id=client_id, user=user, will=will, clean_session=clean_session))
+        clean_session::Bool=true) = resolve(connect_async(client, conn, keep_alive=keep_alive, client_id=client_id, user=user, will=will, clean_session=clean_session))
 
 
 """

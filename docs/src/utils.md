@@ -1,5 +1,4 @@
 ```@docs
-dispatch
 mqtt_channel
 topic_eq
 mqtt_read

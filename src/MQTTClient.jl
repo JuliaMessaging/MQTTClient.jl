@@ -1,8 +1,7 @@
 module MQTTClient
 
 using Distributed: Future, RemoteChannel
-using Dagger
-using Sockets: TCPSocket, IPAddr
+using Sockets: TCPSocket, IPAddr, PipeServer
 import Sockets: connect
 using Random: randstring
 import Base: ReentrantLock, lock, unlock, convert
@@ -17,6 +16,8 @@ include("interface.jl")
 export
     Client,
     MQTTConnection,
+    TCPConnection,
+    UDSConnection,
     User,
     QOS_0,
     QOS_1,

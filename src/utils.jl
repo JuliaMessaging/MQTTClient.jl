@@ -1,35 +1,35 @@
-"""
-    @dispatch(ex)
+# """
+#     @dispatch(ex)
 
-A macro that dispatches the execution of an expression `ex` asynchronously.
+# A macro that dispatches the execution of an expression `ex` asynchronously.
 
-If the number of threads is equal to 1, it uses the `@async` macro to execute the expression asynchronously.
+# If the number of threads is equal to 1, it uses the `@async` macro to execute the expression asynchronously.
 
-If the number of threads is greater than 1, it uses the `Dagger.@spawn` macro to execute the expression asynchronously.
+# If the number of threads is greater than 1, it uses the `Dagger.@spawn` macro to execute the expression asynchronously.
 
-If the number of threads is not valid, it throws an exception.
+# If the number of threads is not valid, it throws an exception.
 
-# Examples
-```julia
-julia> @dispatch println("Hello, World!")
-Task (done) @0x00007f8c3e8a1010
+# # Examples
+# ```julia
+# julia> @dispatch println("Hello, World!")
+# Task (done) @0x00007f8c3e8a1010
 
-julia> @dispatch begin
-           sleep(1)
-           println("Hello, World!")
-       end
-Task (done) @0x00007f8c3e8a1010
-```
-"""
-macro dispatch(ex)
-    if Threads.nthreads() == 1
-        return :(@async $(esc(ex)))
-    elseif Threads.nthreads() > 1
-        return :(Dagger.@spawn $(esc(ex)))
-    else
-        return :(throw(Exception("Threads are not valid")))
-    end
-end
+# julia> @dispatch begin
+#            sleep(1)
+#            println("Hello, World!")
+#        end
+# Task (done) @0x00007f8c3e8a1010
+# ```
+# """
+# macro dispatch(ex)
+#     if Threads.nthreads() == 1
+#         return :(@async $(esc(ex)))
+#     elseif Threads.nthreads() > 1
+#         return :(Dagger.@spawn $(esc(ex)))
+#     else
+#         return :(throw(Exception("Threads are not valid")))
+#     end
+# end
 
 """
     mqtt_channel(len::Number=128)
