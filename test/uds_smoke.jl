@@ -1,16 +1,16 @@
-import MQTTClient.User, MQTTClient.TCPConnection
+import MQTTClient.User, MQTTClient.UDSConnection
 
-const MQTT_BROKER = TCPConnection("test.mosquitto.org", 1883)
+const MQTT_BROKER = UDSConnection("/tmp/mqtt/mqtt.sock")
 
 try
-    s = connect(MQTT_BROKER.host, MQTT_BROKER.port)
+    s = connect(MQTT_BROKER.path)
     close(s)
 
-    @testset "Smoke tests" begin
-        println("Running smoke tests")
+    @testset "UDS Smoke tests" begin
+        println("Running smoke tests for Unix Domain Socket connection to broker at $MQTT_BROKER\n")
 
         condition = Condition()
-        topic = "foo"
+        topic = "mqttclient"
         payload = Random.randstring(20)
         client_test_res = Channel{Bool}(32)
 
@@ -23,16 +23,19 @@ try
             notify(condition)
         end
 
-        client = Client()
+        client = Client(MQTT_BROKER.path)
         println(client)
 
         println("Testing reconnect")
         connect(client, MQTT_BROKER)
+        println("connected")
         sleep(0.5)
         disconnect(client)
+        println("disconnected")
         sleep(0.5)
         connect(client, MQTT_BROKER)
         sleep(0.5)
+        println("connected")
 
         @time subscribe(client, topic, on_msg, qos=QOS_2)
 
@@ -91,7 +94,7 @@ try
             put!(client_test_res, (t,msg))
         end
 
-        client = Client()
+        client = Client(MQTT_BROKER.path)
 
         connect(client, MQTT_BROKER)
         sleep(0.5)
@@ -127,6 +130,6 @@ try
         end
     end
 catch e
-    println("$(MQTT_BROKER.host):$(MQTT_BROKER.port) not online -- skipping smoke test")
+    println("$MQTT_BROKER not online -- skipping smoke test")
     @error e
 end
