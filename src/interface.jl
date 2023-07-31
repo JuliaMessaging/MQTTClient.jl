@@ -1,18 +1,44 @@
 """
-    MQTTConnection(;ping_timeout=UInt64(60))
+    MQTTConnection(host::IPAddr; ping_timeout=UInt64(60), port=1883, keep_alive::Int64=0, client_id::String=randstring(8), user::User=User("", ""), will::Message=Message(false, 0x00, false, "", UInt8[]), clean_session::Bool=true)
 
-Create a new `Client` object with the specified `ping_timeout` (optional).
+Create a new `Client` object with the specified `host` and optional keyword arguments.
+
+# Arguments
+- `host::IPAddr`: The IP address of the MQTT broker.
 
 # Keyword Arguments
 - `ping_timeout::UInt64=60`: The number of seconds to wait for a ping response before disconnecting. Default is 60.
+- `port::Int=1883`: The port number to connect to. Default is 1883.
+- `keep_alive::Int64=0`: The number of seconds between sending keep-alive messages. Default is 0.
+- `client_id::String=randstring(8)`: The client ID to use when connecting. Default is a random 8-character string.
+- `user::User=User("", "")`: The username and password to use when connecting. Default is an empty username and password.
+- `will::Message=Message(false, 0x00, false, "", UInt8[])`: The last will and testament message to send if the client disconnects unexpectedly. Default is an empty message.
+- `clean_session::Bool=true`: Whether to start a clean session when connecting. Default is true.
 
 # Examples
 ```julia
-client = MQTTConnection()
-client = MQTTConnection(ping_timeout=30)
+host = Sockets.getaddrinfo("test.mosquitto.org")
+client = MQTTConnection(host)
+
+host = Sockets.ip"192.168.1.10"
+client = MQTTConnection(host, port=8883, user=User("foo", "bar"))
+
+host = Sockets.localhost
+client = MQTTConnection(host, port=5000, keep_alive=10)
 ```
 """
-MQTTConnection(;ping_timeout=UInt64(60)) = Client(ping_timeout)
+function MQTTConnection(host::IPAddr;
+        ping_timeout=UInt64(60),
+        port=1883,
+        keep_alive::Int64=0,
+        client_id::String=randstring(8),
+        user::User=User("", ""),
+        will::Message=Message(false, 0x00, false, "", UInt8[]),
+        clean_session::Bool=true)
+    client = Client(ping_timeout)
+    resolve(connect_async(client, "$host", port, keep_alive=keep_alive, client_id=client_id, user=user, will=will, clean_session=clean_session))
+    return client
+end
 
 """
     connect_async(client::Client, host::AbstractString, port::Integer=1883;

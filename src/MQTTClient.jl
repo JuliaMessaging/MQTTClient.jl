@@ -2,7 +2,7 @@ module MQTTClient
 
 using Distributed: Future, RemoteChannel
 using Dagger
-using Sockets: TCPSocket
+using Sockets: TCPSocket, IPAddr
 import Sockets: connect
 using Random: randstring
 import Base: ReentrantLock, lock, unlock, convert

@@ -51,6 +51,29 @@ macro mqtt_channel(len::Number=128)
     return Threads.nthreads() > 1 ? :(RemoteChannel(()->Channel{Packet}($len))) : :(Channel{Packet}($len))
 end
 
+"""
+    topic_eq(baseT::String, compareT::String)
+
+A macro that compares two MQTT topics and returns a boolean value based on their equality. If the `baseT` topic contains a wildcard character `#`, the macro checks if the `compareT` topic contains the string before the wildcard character. Otherwise, it checks if the two topics are equal.
+
+# Examples
+```julia
+julia> @topic_eq "sport/#" "sport/tennis"
+true
+
+julia> @topic_eq "sport/tennis" "sport/football"
+false
+```
+"""
+function topic_eq(baseT, compareT)
+   if contains(baseT, "#")
+       T = split(baseT, "#")[1]
+       return contains(compareT, T)
+   else
+       return baseT == compareT
+   end
+end
+
 mqtt_read(s::IO, ::Type{UInt16}) = ntoh(read(s, UInt16))
 
 function mqtt_read(s::IO, ::Type{String})

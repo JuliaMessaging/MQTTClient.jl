@@ -1,0 +1,12 @@
+```@docs
+MQTTConnection
+connect_async
+connect
+disconnect
+subscribe_async
+subscribe
+unsubscribe_async
+unsubscribe
+publish_async
+publish
+```
