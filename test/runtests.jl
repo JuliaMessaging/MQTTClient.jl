@@ -14,7 +14,7 @@ end
 end
 
 
-if !haskey(ENV, "GITHUB_ACTION")
+# if !haskey(ENV, "GITHUB_ACTION")
     # smoke and stress test test functions.
     include("smoketest.jl")
 
@@ -25,7 +25,7 @@ if !haskey(ENV, "GITHUB_ACTION")
     # The broker needs to be configured for anonymous access and to
     # accept clients which have a max_keepalive = 0
     include("smoketest.uds.jl")
-end
+# end
 
 ## !TODO: Fix packet tests for full unit testing
 # include("mocksocket.jl")
