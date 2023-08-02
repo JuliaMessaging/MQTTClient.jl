@@ -1,10 +1,10 @@
 # MQTTClient.jl
 
-[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://NickMcSweeney.github.io/MQTTClient.jl/stable/)
-[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://NickMcSweeney.github.io/MQTTClient.jl/dev/)
-[![Build Status](https://github.com/NickMcSweeney/MQTTClient.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/NickMcSweeney/MQTTClient.jl/actions/workflows/CI.yml?query=branch%3Amain)
-[![Coverage](https://codecov.io/gh/NickMcSweeney/MQTTClient.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/NickMcSweeney/MQTTClient.jl)
-[![Coverage](https://coveralls.io/repos/github/NickMcSweeney/MQTTClient.jl/badge.svg?branch=main)](https://coveralls.io/github/NickMcSweeney/MQTTClient.jl?branch=main)
+[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://JuliaMQTT.github.io/MQTTClient.jl/stable/)
+[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://JuliaMQTT.github.io/MQTTClient.jl/dev/)
+[![Build Status](https://github.com/JuliaMQTT/MQTTClient.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/JuliaMQTT/MQTTClient.jl/actions/workflows/CI.yml?query=branch%3Amain)
+[![Coverage](https://codecov.io/gh/JuliaMQTT/MQTTClient.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/JuliaMQTT/MQTTClient.jl)
+[![Coverage](https://coveralls.io/repos/github/JuliaMQTT/MQTTClient.jl/badge.svg?branch=main)](https://coveralls.io/github/JuliaMQTT/MQTTClient.jl?branch=main)
 [![Code Style: Blue](https://img.shields.io/badge/code%20style-blue-4495d1.svg)](https://github.com/invenia/BlueStyle)
 
 MQTT Client Library for Julia

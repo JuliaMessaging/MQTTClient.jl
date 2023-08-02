@@ -34,20 +34,35 @@ client = MQTTConnection(ping_timeout=30)
 client = MQTTConnection("/tmp/mqtt/mqtt.sock")
 ```
 """
-function MQTTConnection(host::IPAddr;
+MakeConnection(host::Union{IPAddr, String}, port::Int64;
         ping_timeout=UInt64(60),
-        port=1883,
-        keep_alive::Int64=0,
+        keep_alive::Int64=32,
         client_id::String=randstring(8),
         user::User=User("", ""),
         will::Message=Message(false, 0x00, false, "", UInt8[]),
-        clean_session::Bool=true)
-    client = Client(ping_timeout)
-    resolve(connect_async(client, "$host", port, keep_alive=keep_alive, client_id=client_id, user=user, will=will, clean_session=clean_session))
-    return client
+        clean_session::Bool=true)::Tuple = MakeConnection(IOConnection(host,port),ping_timeout,keep_alive,client_id,user,will,clean_session)
+
+
+MakeConnection(path::String;
+        ping_timeout=UInt64(60),
+        keep_alive::Int64=32,
+        client_id::String=randstring(8),
+        user::User=User("", ""),
+        will::Message=Message(false, 0x00, false, "", UInt8[]),
+        clean_session::Bool=true)::Tuple = MakeConnection(IOConnection(path),ping_timeout,keep_alive,client_id,user,will,clean_session)
+
+function MakeConnection(io::T,
+        ping_timeout=UInt64(60),
+        keep_alive::Int64=32,
+        client_id::String=randstring(8),
+        user::User=User("", ""),
+        will::Message=Message(false, 0x00, false, "", UInt8[]),
+        clean_session::Bool=true)::Tuple where T <: AbstractIOConnection
+    return (Client(ping_timeout), MQTTConnection(io, keep_alive, client_id, user, will, clean_session))
+
 end
-MQTTConnection(;ping_timeout=UInt64(60)) = Client(ping_timeout)
-MQTTConnection(path::AbstractString) = Client(path)
+
+
 
 """
     connect_async(client::Client, conn::AbstractConnection;
@@ -67,27 +82,16 @@ Returns a `Future` object that contains a session_present bit from the broker on
 - `will::Message=Message(false, 0x00, false, "", Array{UInt8}())`: The MQTT will to send to all other clients when this client disconnects.  
 - `clean_session::Bool=true`: Flag to resume a session with the broker if present.
 """
-function connect_async(client::Client, conn::AbstractConnection;
-                       keep_alive::Int64=10,
-                       client_id::String=randstring(8),
-                       user::User=User("", ""),
-                       will::Message=Message(false, 0x00, false, "", UInt8[]),
-                       clean_session::Bool=true)
+function connect_async(client::Client, connection::MQTTConnection)
 
     client.write_packets = @mqtt_channel
     try
-        client.keep_alive = convert(UInt16, keep_alive)
+        client.keep_alive = convert(UInt16, connection.keep_alive)
     catch
         error("Could not convert keep_alive to UInt16")
     end
 
-    if conn.type == UDS
-        # Sockets.jl will choose unix socket and return PipeServer()
-        client.socket = connect(conn.path)
-    else
-        # Sockets.jl will choose tcp socket and return TCPSocket()
-        client.socket = connect(conn.host, conn.port)
-    end
+    client.socket = connect(connection.protocol)
 
     @debug "connect to host"
     @async write_loop(client)
@@ -111,17 +115,17 @@ function connect_async(client::Client, conn::AbstractConnection;
     local optional_user = ()
     local optional_will = ()
 
-    if length(user.name) > 0 && length(user.password) > 0
+    if length(connection.user.name) > 0 && length(connection.user.password) > 0
         connect_flags |= 0xC0
-        optional_user = (user.name, user.password)
-    elseif length(user.name) > 0
+        optional_user = (connection.user.name, connection.user.password)
+    elseif length(connection.user.name) > 0
         connect_flags |= 0x80
-        optional_user = (user.name)
+        optional_user = (connection.user.name)
     end
 
-    if length(will.topic) > 0
-        optional_will = (will.topic, convert(UInt16, length(will.payload)), will.payload)
-        connect_flags |= 0x04 | ((will.qos & 0x03) << 3) | ((will.retain & 0x01) << 5)
+    if length(connection.will.topic) > 0
+        optional_will = (connection.will.topic, convert(UInt16, length(connection.will.payload)), connection.will.payload)
+        connect_flags |= 0x04 | ((connection.will.qos & 0x03) << 3) | ((connection.will.retain & 0x01) << 5)
     end
 
     @debug "set optional fields"
@@ -134,7 +138,7 @@ function connect_async(client::Client, conn::AbstractConnection;
                  protocol_level,
                  connect_flags,
                  client.keep_alive,
-                 client_id,
+                 connection.client_id,
                  optional_user...,
                  optional_will...)
 
@@ -162,12 +166,7 @@ Waits until the connect is done. Returns the session_present bit from the broker
 - `clean_session::Bool=true`: Flag to resume a session with the broker if present.
 """
 
-connect(client::Client, conn::AbstractConnection;
-        keep_alive::Int64=0,
-        client_id::String=randstring(8),
-        user::User=User("", ""),
-        will::Message=Message(false, 0x00, false, "", UInt8[]),
-        clean_session::Bool=true) = resolve(connect_async(client, conn, keep_alive=keep_alive, client_id=client_id, user=user, will=will, clean_session=clean_session))
+connect(client::Client, connection::MQTTConnection) = resolve(connect_async(client, connection))
 
 
 """
