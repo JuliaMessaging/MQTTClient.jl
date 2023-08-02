@@ -30,7 +30,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install mosquitto
-          sudo systemctl disable --now mosquitto
       - uses: actions/checkout@v3
       - uses: julia-actions/setup-julia@v1
         with:
@@ -40,8 +39,8 @@ jobs:
       - uses: julia-actions/julia-buildpkg@v1
       - name: Run mosquitto broker
         run: |
-          sudo pkill -9 mosquitto
-          mosquitto -c ${{ github.workspace }}/test/mosquitto.test.config
+          mv ${{ github.workspace }}/test/mosquitto.test.config /etc/mosquitto/conf.d/mosquitto.config
+          sudo systemctl restart mosquitto
       - uses: julia-actions/julia-runtest@v1
       - uses: julia-actions/julia-processcoverage@v1
       - uses: codecov/codecov-action@v3
