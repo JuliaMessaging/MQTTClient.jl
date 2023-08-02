@@ -8,11 +8,11 @@ DocMeta.setdocmeta!(MQTTClient, :DocTestSetup, :(using MQTTClient); recursive=tr
 makedocs(;
     modules=[MQTTClient],
     authors="Nick Shindler <nick@shindler.tech>",
-    repo="https://github.com/JuliaMQTT/MQTTClient.jl/blob/{commit}{path}#{line}",
+    repo="https://github.com/JuliaMessaging/MQTTClient.jl/blob/{commit}{path}#{line}",
     sitename="MQTTClient.jl",
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",
-        canonical="https://JuliaMQTT.github.io/MQTTClient.jl",
+        canonical="https://JuliaMessaging.github.io/MQTTClient.jl",
         edit_link="main",
         assets=String[],
     ),
@@ -32,6 +32,6 @@ makedocs(;
 )
 
 deploydocs(;
-    repo="github.com/JuliaMQTT/MQTTClient.jl",
+    repo="github.com/JuliaMessaging/MQTTClient.jl",
     devbranch="main",
 )

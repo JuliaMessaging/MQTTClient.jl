@@ -1,6 +1,6 @@
 # MQTTClient
 
-Documentation for [MQTTClient](https://github.com/JuliaMQTT/MQTTClient.jl).
+Documentation for [MQTTClient](https://github.com/JuliaMessaging/MQTTClient.jl).
 
 
 Installation
