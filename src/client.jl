@@ -1,30 +1,25 @@
 """
-    Client([ping_timeout::UInt64])
+    Client
 
-A mutable struct that represents an MQTT client.
+A mutable struct representing an MQTT client.
 
-# Arguments
-- `ping_timeout::UInt64`: The number of seconds to wait for a ping response before disconnecting. Default is 60.
-- `path::AbstractString`: The path to the unix domain socket created by the broker.
+An MQTT client is any device (from a microcontroller up to a fully-fledged server) that runs an MQTT library and connects to an MQTT broker over a network. Information is organized in a hierarchy of topics.
 
 # Fields
-- `on_msg::Dict{String,Function}`: A dictionary of functions that will be called when a message is received.
-- `keep_alive::UInt16`: The number of seconds between pings.
-- `last_id::UInt16`: The last message ID used.
-- `in_flight::Dict{UInt16, Future}`: A dictionary of messages that are waiting for a response.
-- `write_packets::AbstractChannel`: A channel for writing packets to the socket.
-- `socket`: The socket used for communication.
-- `socket_lock`: A lock for the socket.
-- `ping_timeout::UInt64`: The number of seconds to wait for a ping response before disconnecting.
-- `ping_outstanding::Atomic{UInt8}`: A flag indicating whether a ping has been sent but not yet received.
-- `last_sent::Atomic{Float64}`: The time the last packet was sent.
-- `last_received::Atomic{Float64}`: The time the last packet was received.
+- `on_msg::Dict{String,Function}`: A dictionary mapping topic names to callback functions.
+- `keep_alive::UInt16`: The keep-alive time in seconds.
+- `last_id::UInt16`: The last packet identifier used.
+- `in_flight::Dict{UInt16, Future}`: A dictionary mapping packet identifiers to futures.
+- `write_packets::AbstractChannel`: A channel for writing packets.
+- `socket`: The socket used for communication with the broker.
+- `socket_lock`: A lock for synchronizing access to the socket.
+- `ping_timeout::UInt64`: The ping timeout in seconds.
+- `ping_outstanding::Atomic{UInt8}`: An atomic counter for the number of outstanding ping requests.
+- `last_sent::Atomic{Float64}`: An atomic float representing the timestamp of the last sent packet.
+- `last_received::Atomic{Float64}`: An atomic float representing the timestamp of the last received packet.
 
-# Examples
-```julia
-julia> client = Client()
-julia> client = Client("/tmp/mqtt/mqtt.sock")
-```
+# Constructor
+`Client(ping_timeout::UInt64=UInt64(60))` constructs a new `Client` object with the specified ping timeout (default: 60 seconds).
 """
 mutable struct Client
 
