@@ -39,7 +39,9 @@ jobs:
       - uses: julia-actions/julia-buildpkg@v1
       - name: Run mosquitto broker
         run: |
-          mosquitto -c tests/mosquitto.test.config
+          ls ${{ github.workspace }}
+          ls ${{ github.workspace }}/test
+          mosquitto -c ${{ github.workspace }}/test/mosquitto.test.config
       - uses: julia-actions/julia-runtest@v1
       - uses: julia-actions/julia-processcoverage@v1
       - uses: codecov/codecov-action@v3
