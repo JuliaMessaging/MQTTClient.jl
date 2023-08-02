@@ -7,10 +7,10 @@ import MQTTClient: topic_wildcard_len_check, filter_wildcard_len_check, MQTTExce
 import Sockets: TCPSocket, PipeServer, connect, localhost, getaddrinfo, IOError, DNSError
 
 @testset verbose=true "client tests" begin
-    # include("unittest.client.jl")
+    include("unittest.client.jl")
 end
 @testset verbose=true "utils tests" begin
-    # include("unittest.utils.jl")
+    include("unittest.utils.jl")
 end
 
 

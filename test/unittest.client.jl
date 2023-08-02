@@ -48,7 +48,7 @@ end
         conn = MQTTClient.MQTTConnection(MQTTClient.IOConnection(localhost, 1883))
         @test conn.protocol isa MQTTClient.TCP
         @test conn.protocol.ip == localhost
-        @test conn.keep_alive == 10
+        @test conn.keep_alive == 32
         @test length(conn.client_id) == 8
         @test conn.user == MQTTClient.User("", "")
         @test conn.will == MQTTClient.Message(false, 0x00, false, "", UInt8[])
@@ -59,7 +59,7 @@ end
         conn = MQTTClient.MQTTConnection(MQTTClient.IOConnection("test.mosquitto.org", 1883))
         @test conn.protocol isa MQTTClient.TCP
         @test conn.protocol.ip == getaddrinfo("test.mosquitto.org")
-        @test conn.keep_alive == 10
+        @test conn.keep_alive == 32
         @test length(conn.client_id) == 8
         @test conn.user == MQTTClient.User("", "")
         @test conn.will == MQTTClient.Message(false, 0x00, false, "", UInt8[])
@@ -71,7 +71,7 @@ end
         conn = MQTTClient.MQTTConnection(MQTTClient.IOConnection(path))
         @test conn.protocol isa MQTTClient.UDS
         @test conn.protocol.path == path
-        @test conn.keep_alive == 10
+        @test conn.keep_alive == 32
         @test length(conn.client_id) == 8
         @test conn.user == MQTTClient.User("", "")
         @test conn.will == MQTTClient.Message(false, 0x00, false, "", UInt8[])
