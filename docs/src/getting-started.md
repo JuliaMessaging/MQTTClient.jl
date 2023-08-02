@@ -1,13 +1,14 @@
 # MQTTClient
 
-Documentation for [MQTTClient](https://github.com/NickMcSweeney/MQTTClient.jl).
+Documentation for [MQTTClient](https://github.com/JuliaMQTT/MQTTClient.jl).
 
 
 Installation
 ------------
 ```julia
-Pkg.clone("https://github.com/NickMcSweeney/MQTTClient.jl.git")
+Pkg.add("MQTTClient")
 ```
+
 Testing
 -------
 ```julia
@@ -24,20 +25,13 @@ using MQTTClient
 
 Advanced Usage
 --------------
-True multi-threading is available via Dagger.jl and will be enabled if Julia is run with more than 1 thread enabled.
-
-```bash
-julia -t 2
-```
-The _read_loop_, _write_loop_ _keep_alive_loop_, and _on_msg_ callback are all called as scheduled processes via `Dagger.@spawn` rather than `@async`. 
-This is work in progress, so it is not 100% stable. 
-Also based on testing, for simple/low load networks it is slower to run it threaded than to run async (probably because there is more overhead managing threads).
+The _read_loop_, _write_loop_ _keep_alive_loop_, and _on_msg_ callback are all called as async processes via `@async`.
 
 ## Getting started
 To use this library you need to follow at least these steps:
-1. Define an `on_msg` callback function for a given topic.
+1. Create an `MQTTConnection` struct for a given broker and protocol.
 2. Create an instance of the `Client` struct.
-3. Call the connect method with your `Client` instance.
+3. Call the connect method with your `Client` and `MQTTConnection` instance.
 4. Exchange data with the broker through publish, subscribe and unsubscribe. When subscribing, pass your `on_msg` function for that topic.
 5. Disconnect from the broker. (Not strictly necessary, if you don't want to resume the session but considered good form and less likely to crash).
 
@@ -53,9 +47,9 @@ function on_msg(topic, payload)
     info("Received message topic: [", topic, "] payload: [", String(payload), "]")
 end
 
-#Instantiate a client.
-client = Client()
-connect(client, broker, 1883)
+#Instantiate a client and connection.
+client, connection = MakeConnection(broker, 1883)
+connect(client, connection)
 #Set retain to true so we can receive a message from the broker once we subscribe
 #to this topic.
 publish(client, "jlExample", "Hello World!", retain=true)

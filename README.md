@@ -9,7 +9,9 @@
 
 MQTT Client Library for Julia
 
-This library provides a powerful and easy-to-use interface for connecting to an MQTT broker, publishing messages, and subscribing to topics to receive published messages. It supports fully multi-threaded operation with Dagger.jl and file persistence for reliable message delivery.
+This library provides a MQTT Client and functions for interfacing with a standard MQTT broker. This includes publishing messages, and subscribing to topics to receive published messages. 
+
+This package supports using Transmission Control Protocol (TCP) as well as Unix Domain Sockets (UDS) as the protocol to connect to the MQTT broker over. An example configuration for a `Mosquitto` broker can be found in the test folder. 
 
 ## Sponsorship
 ![sponsor logo](https://www.volkerwessels.com/dynamics/modules/SFIL0200/view.php?fil_Id=366300&thumb_nr=26)
@@ -31,14 +33,10 @@ This work is based on the MQTT.jl packages created by [femtomic](https://github.
 - [ ] look at enums and how to use them
 - [ ] qos2 
     * separate handle_pubrecrel into two different methods and fix them
-- [ ] fix connect method
+- [ ] review connect method
     * make it not hardcoded
 - [ ] disconnect_async/disconnect
     * think about what we need to do and how
     * the reconnect should still work
 - [ ] implement clean session = false
-- [ ] remove dagger
-    * create a DaggerMQTT.jl or something like this pkg.
 - [ ] add global on_msg handler option back
-- [ ] shamelessly copy documenter structure of Rocket
-    * move docs out of readme

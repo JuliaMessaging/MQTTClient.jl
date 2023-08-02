@@ -1,9 +1,14 @@
 ```@docs
+Client
+MQTTConnection
+IOConnection
+TCP
+UDS
 MQTTException
+AbstractIOConnection
 Packet
 Message
 User
-Client
 write_loop
 read_loop
 keep_alive_loop

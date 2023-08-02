@@ -1,5 +1,5 @@
 ```@docs
-MQTTConnection
+MakeConnection
 connect_async
 connect
 disconnect
