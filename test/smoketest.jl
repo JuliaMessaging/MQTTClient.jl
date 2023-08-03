@@ -5,7 +5,16 @@ function smoke_test(client, conn)
     client_test_res = Channel{Bool}(100)
 
     function on_msg(t, p)
-        @time "on_msg[$t]" begin
+        if VERSION >= v"1.9.0"
+            @time "on_msg[$t]" begin
+                msg = p |> String
+                println("Received message topic: [", t, "] payload: [", msg, "]")
+                put!(client_test_res, MQTTClient.topic_eq("$topic#", t))
+                put!(client_test_res, msg == payload)
+                sleep(0.01)
+                notify(condition)
+            end
+        else
             msg = p |> String
             println("Received message topic: [", t, "] payload: [", msg, "]")
             put!(client_test_res, MQTTClient.topic_eq("$topic#", t))
@@ -26,10 +35,17 @@ function smoke_test(client, conn)
     connect(client, conn)
     sleep(0.05)
 
-    @time "subscribe_async" subscribe_async(client, topic, on_msg, qos=QOS_2)
-    @time "subscribe[QOS0]" subscribe(client, "$topic/qos0", on_msg, qos=QOS_0)
-    @time "subscribe[QOS1]" subscribe(client, "$topic/qos1", on_msg, qos=QOS_1)
-    @time "subscribe[QOS2]" subscribe(client, "$topic/qos2", on_msg, qos=QOS_2)
+    if VERSION >= v"1.9.0"
+        @time "subscribe_async" subscribe_async(client, topic, on_msg, qos=QOS_2)
+        @time "subscribe[QOS0]" subscribe(client, "$topic/qos0", on_msg, qos=QOS_0)
+        @time "subscribe[QOS1]" subscribe(client, "$topic/qos1", on_msg, qos=QOS_1)
+        @time "subscribe[QOS2]" subscribe(client, "$topic/qos2", on_msg, qos=QOS_2)
+    else
+        @time subscribe_async(client, topic, on_msg, qos=QOS_2)
+        @time subscribe(client, "$topic/qos0", on_msg, qos=QOS_0)
+        @time subscribe(client, "$topic/qos1", on_msg, qos=QOS_1)
+        @time subscribe(client, "$topic/qos2", on_msg, qos=QOS_2)
+    end
 
     println("Testing publish qos 0")
     publish(client, "$topic/qos0", payload, qos=QOS_0)
@@ -97,14 +113,23 @@ function stress_test(client, conn)
     connect(client, conn)
     sleep(0.05)
 
-    @time "subscribe1" subscribe(client, topic1, on_msg, qos=QOS_2)
-    @time "subscribe2" subscribe(client, topic2, on_msg, qos=QOS_2)
-    @time "subscribe3" subscribe(client, topic3, on_msg, qos=QOS_2)
-    @time "subscribe4" subscribe(client, topic4, on_msg, qos=QOS_2)
-    @time "subscribe5" subscribe(client, topic5, on_msg, qos=QOS_2)
-    @time "subscribe6" subscribe(client, topic6, on_msg, qos=QOS_2)
+    if VERSION >= v"1.9.0"
+        @time "subscribe1" subscribe(client, topic1, on_msg, qos=QOS_2)
+        @time "subscribe2" subscribe(client, topic2, on_msg, qos=QOS_2)
+        @time "subscribe3" subscribe(client, topic3, on_msg, qos=QOS_2)
+        @time "subscribe4" subscribe(client, topic4, on_msg, qos=QOS_2)
+        @time "subscribe5" subscribe(client, topic5, on_msg, qos=QOS_2)
+        @time "subscribe6" subscribe(client, topic6, on_msg, qos=QOS_2)
+    else
+        @time subscribe(client, topic1, on_msg, qos=QOS_2)
+        @time subscribe(client, topic2, on_msg, qos=QOS_2)
+        @time subscribe(client, topic3, on_msg, qos=QOS_2)
+        @time subscribe(client, topic4, on_msg, qos=QOS_2)
+        @time subscribe(client, topic5, on_msg, qos=QOS_2)
+        @time subscribe(client, topic6, on_msg, qos=QOS_2)
+    end
 
-    @time "publish" for i in 1:256
+    @time for i in 1:256
         if i%6 == 1
             publish_async(client, topic1, payload)
         elseif i%6 == 2
@@ -120,10 +145,20 @@ function stress_test(client, conn)
         end
     end
     count = 0
-    @time "payload recieved" while count < 256
-        wait(client_test_res)
-        t,p = take!(client_test_res)
-        @test p == payload
-        count += 1
+
+    if VERSION >= v"1.9.0"
+        @time "payload recieved" while count < 256
+            wait(client_test_res)
+            t,p = take!(client_test_res)
+            @test p == payload
+            count += 1
+        end
+    else
+        @time while count < 256
+            wait(client_test_res)
+            t,p = take!(client_test_res)
+            @test p == payload
+            count += 1
+        end
     end
 end

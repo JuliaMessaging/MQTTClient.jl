@@ -23,10 +23,9 @@ makedocs(;
         "MQTT Client" => "client.md",
         "MQTT API" => [
             "Client" => "api/client.md",
-            "Internal Functions" => "api/handlers.md"
-            "Interfacing Functions" => "api/interface.md"
+            "Internal Functions" => "api/handlers.md",
+            "Interfacing Functions" => "api/interface.md",
             ],
-
         "Utils" => "utils.md",
     ],
 )
