@@ -9,9 +9,13 @@
 
 MQTT Client Library for Julia
 
-This library provides a MQTT Client and functions for interfacing with a standard MQTT broker. This includes publishing messages, and subscribing to topics to receive published messages. 
+This library provides a MQTT Client and functions for interfacing with a standard MQTT broker. This includes publishing messages, and subscribing to topics to receive published messages. See the [documentation](https://JuliaMessaging.github.io/MQTTClient.jl) for more information.
 
 This package supports using Transmission Control Protocol (TCP) as well as Unix Domain Sockets (UDS) as the protocol to connect to the MQTT broker over. An example configuration for a `Mosquitto` broker can be found in the test folder. 
+
+## Example Use
+
+An example of how this package can be used is in the [examples/basic.jl](examples/basic.jl) file.
 
 ## Sponsorship
 ![sponsor logo](https://www.volkerwessels.com/dynamics/modules/SFIL0200/view.php?fil_Id=366300&thumb_nr=26)
@@ -26,7 +30,6 @@ This work is based on the MQTT.jl packages created by [femtomic](https://github.
 
 ### TODO
 
-- [ ] Review examples
 - [ ] protocol error handling
 - [ ] reconnect
 - [ ] persistence (in memory, files)
@@ -39,4 +42,4 @@ This work is based on the MQTT.jl packages created by [femtomic](https://github.
     * think about what we need to do and how
     * the reconnect should still work
 - [ ] implement clean session = false
-- [ ] add global on_msg handler option back
+- [ ] investigate adding global on_msg handler option back
