@@ -12,33 +12,33 @@ using Random
     msg = "bar"
     payload = Vector{UInt8}("baz")
 
-   #  function run_client(client, conn)
-   #     topic = "foo"
-   #     payload = Random.randstring(20)
+    function run_client(client, conn)
+       topic = "foo"
+       payload = Random.randstring(20)
 
-   #     function on_msg(t, p)
-   #         msg = p |> String
-   #         @assert MQTTClient.topic_eq("$topic#", t)
-   #         @assert msg == payload
-   #     end
+       function on_msg(t, p)
+           msg = p |> String
+           @assert MQTTClient.topic_eq("$topic#", t)
+           @assert msg == payload
+       end
 
-   #     connect(client, conn)
-   #     sleep(0.05)
-   #     disconnect(client)
-   #     sleep(0.05)
-   #     connect(client, conn)
-   #     sleep(0.05)
+       connect(client, conn)
+       sleep(0.05)
+       disconnect(client)
+       sleep(0.05)
+       connect(client, conn)
+       sleep(0.05)
 
-   #     subscribe(client, "$topic/qos0", on_msg, qos=QOS_0)
-   #     subscribe(client, "$topic/qos1", on_msg, qos=QOS_1)
-   #     subscribe(client, "$topic/qos2", on_msg, qos=QOS_2)
+       subscribe(client, "$topic/qos0", on_msg, qos=QOS_0)
+       subscribe(client, "$topic/qos1", on_msg, qos=QOS_1)
+       subscribe(client, "$topic/qos2", on_msg, qos=QOS_2)
 
-   #     publish(client, "$topic/qos0", payload, qos=QOS_0)
-   #     publish(client, "$topic/qos1", payload, qos=QOS_1)
-   #     publish(client, "$topic/qos2", payload, qos=QOS_2)
+       publish(client, "$topic/qos0", payload, qos=QOS_0)
+       publish(client, "$topic/qos1", payload, qos=QOS_1)
+       publish(client, "$topic/qos2", payload, qos=QOS_2)
 
-   #     disconnect(client)
-   # end
+       disconnect(client)
+   end
 
     @compile_workload begin
         # all calls in this block will be precompiled, regardless of whether
@@ -53,16 +53,15 @@ using Random
         disconnect(udsclient)
 
         tcpclient, tcpconnection = MakeConnection("test.mosquitto.org", 1883)
-        # try
-        #     run_client(tcpclient, tcpconnection)
-        # catch e
-        # finally
-            # connect_async(tcpclient, tcpconnection)
-            subscribe_async(tcpclient, topic, on_msg, qos=QOS_2)
-            publish_async(tcpclient, topic, msg)
-            publish_async(tcpclient, topic, payload)
-            unsubscribe_async(tcpclient, topic)
-            disconnect(tcpclient)
-        # end
+
+        # cannot run against live broker connections
+        # TODO: fix the mocksocket to allow testing/precompiling connections.
+        # run_client(tcpclient, tcpconnection)
+        # connect_async(tcpclient, tcpconnection)
+        subscribe_async(tcpclient, topic, on_msg, qos=QOS_2)
+        publish_async(tcpclient, topic, msg)
+        publish_async(tcpclient, topic, payload)
+        unsubscribe_async(tcpclient, topic)
+        disconnect(tcpclient)
     end
 end
