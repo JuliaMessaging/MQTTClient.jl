@@ -42,8 +42,9 @@ jobs:
       - name: Run mosquitto broker
         run: |
           sudo systemctl stop mosquitto
-          sudo mv test/mosquitto.test.config /etc/mosquitto/mosquitto.conf
-          sudo mv ${{ github.workspace }}/test/mosquitto.test.passwordfile /etc/mosquitto/mosquitto.test.passwordfile
+          sudo mv ${{ github.workspace }}/test/mosquitto.test.config /etc/mosquitto/mosquitto.conf
+          sudo sed -i -e "s/password_file mosquitto.test.passwordfile/password_file \/etc\/mosquitto\/passwordfile/g" /etc/mosquitto/mosquitto.conf
+          sudo mv ${{ github.workspace }}/test/mosquitto.test.passwordfile /etc/mosquitto/passwordfile
           sudo systemctl restart mosquitto
           systemctl status mosquitto
           lsof /tmp/mqtt.sock

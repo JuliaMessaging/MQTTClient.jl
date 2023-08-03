@@ -31,6 +31,6 @@ include("smoketest.secure.jl")
 # The broker needs to be configured for anonymous access
 include("smoketest.uds.jl")
 
-## !TODO: Fix packet tests for full unit testing
+## !TODO: Fix mocksocket and packet tests for full unit testing
 # include("mocksocket.jl")
 # include("packet.jl")
