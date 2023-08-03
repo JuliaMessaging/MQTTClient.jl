@@ -15,7 +15,7 @@ include("connection.jl")
 include("handlers.jl")
 include("interface.jl")
 
-# include("precompile.jl")
+include("precompile.jl")
 
 export
     MakeConnection,

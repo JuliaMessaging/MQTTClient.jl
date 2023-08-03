@@ -39,7 +39,7 @@ jobs:
       - uses: julia-actions/julia-buildpkg@v1
       - name: Run mosquitto broker
         run: |
-          mv ${{ github.workspace }}/test/mosquitto.test.config /etc/mosquitto/conf.d/mosquitto.config
+          sudo mv ${{ github.workspace }}/test/mosquitto.test.config /etc/mosquitto/conf.d/mosquitto.config
           sudo systemctl restart mosquitto
       - uses: julia-actions/julia-runtest@v1
       - uses: julia-actions/julia-processcoverage@v1
