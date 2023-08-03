@@ -1,22 +1,22 @@
 print("\n"^3)
 
 ## TCP Protocol Smoke Test and Stress Test
-tcp_test_client, tcp_test_conn = MakeConnection(localhost, 1883)
+tcp_test_client, tcp_test_conn = MakeConnection(localhost, 8883, user = MQTTClient.User("test","test"))
 try
     s = connect(tcp_test_conn.protocol)
     close(s)
 
-    @testset "TCP Smoke tests" begin
+    @testset "User/Pass Secured TCP Smoke tests" begin
         println("="^80)
-        println("Running smoke tests against localhost[1883]")
+        println("Running smoke tests against localhost[8883] user:test, pass:test")
         println("-"^80)
 
         smoke_test(tcp_test_client, tcp_test_conn)
     end
 
-    @testset "TCP stress test" begin
+    @testset "User/Pass Secured TCP stress test" begin
         println("="^80)
-        println("Running stress tests against localhost[1883]")
+        println("Running stress tests against localhost[8883] user:test, pass:test")
         println("-"^80)
 
         stress_test(tcp_test_client, tcp_test_conn)

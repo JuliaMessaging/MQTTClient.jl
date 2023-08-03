@@ -56,9 +56,9 @@ end
     end
 
     @testset "MQTT TCP Connection from string" begin
-        conn = MQTTClient.MQTTConnection(MQTTClient.IOConnection("test.mosquitto.org", 1883))
+        conn = MQTTClient.MQTTConnection(MQTTClient.IOConnection("localhost", 1883))
         @test conn.protocol isa MQTTClient.TCP
-        @test conn.protocol.ip == getaddrinfo("test.mosquitto.org")
+        @test conn.protocol.ip == getaddrinfo("localhost")
         @test conn.keep_alive == 32
         @test length(conn.client_id) == 8
         @test conn.user == MQTTClient.User("", "")
@@ -82,7 +82,7 @@ end
 
 @testset verbose = true "MQTT interface functionality" begin
     @testset "Make MQTT tcp connection" begin
-        c, conn = MQTTClient.MakeConnection("test.mosquitto.org", 1883)
+        c, conn = MQTTClient.MakeConnection("localhost", 1883)
         @test c isa MQTTClient.Client
         @test conn isa MQTTClient.MQTTConnection
         c, conn = MQTTClient.MakeConnection(localhost, 1883)

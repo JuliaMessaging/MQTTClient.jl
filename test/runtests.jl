@@ -13,20 +13,23 @@ end
     include("unittest.utils.jl")
 end
 
+# These tests need a mqtt broker running.
+# A mosquitto configuration file is provided that will allow these tests to be run.
+println("Running tests for Julia: ", VERSION)
+# smoke and stress test test functions.
+VERSION < v"1.9.0" ? include("smoketest_v1_6.jl") : include("smoketest.jl")
 
-# if !haskey(ENV, "GITHUB_ACTION")
-    println("Running tests for Julia: ", VERSION)
-    # smoke and stress test test functions.
-    VERSION < v"1.9.0" ? include("smoketest_v1_6.jl") : include("smoketest.jl")
+## Needs to have a broker listening on localhost[1883]
+# The broker needs to be configured for anonymous access
+include("smoketest.tcp.jl")
 
-    ## Needs to have internet connection to run
-    include("smoketest.tcp.jl")
+## Needs to have a broker listening on localhost[8883]
+# The broker needs to be configured for access with user:test passwd:test
+include("smoketest.secure.jl")
 
-    ## Needs to have a broker listening on /tmp/mqtt/mqtt.sock
-    # The broker needs to be configured for anonymous access and to
-    # accept clients which have a max_keepalive = 0
-    include("smoketest.uds.jl")
-# end
+## Needs to have a broker listening on /tmp/mqtt/mqtt.sock
+# The broker needs to be configured for anonymous access
+include("smoketest.uds.jl")
 
 ## !TODO: Fix packet tests for full unit testing
 # include("mocksocket.jl")

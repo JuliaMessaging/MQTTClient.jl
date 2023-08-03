@@ -1,7 +1,7 @@
 print("\n"^3)
 
 ## TCP Protocol Smoke Test and Stress Test
-uds_test_client, uds_test_conn = MakeConnection(MQTTClient.IOConnection("/tmp/mqtt.sock"))
+uds_test_client, uds_test_conn = MakeConnection("/tmp/mqtt.sock")
 try
     s = connect(uds_test_conn.protocol)
     close(s)
