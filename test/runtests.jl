@@ -15,8 +15,9 @@ end
 
 
 # if !haskey(ENV, "GITHUB_ACTION")
+    println("Running tests for Julia: ", VERSION)
     # smoke and stress test test functions.
-    include("smoketest.jl")
+    VERSION < v"1.9.0" ? include("smoketest_v1_6.jl") : include("smoketest.jl")
 
     ## Needs to have internet connection to run
     include("smoketest.tcp.jl")

@@ -15,7 +15,7 @@ include("connection.jl")
 include("handlers.jl")
 include("interface.jl")
 
-include("precompile.jl")
+VERSION > v"1.8" ? include("precompile.jl") : @debug "PrecompileTools is most useful in versions 1.9+. $VERSION is too old, explicit precompile is not being used."
 
 export
     MakeConnection,
