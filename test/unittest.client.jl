@@ -2,52 +2,21 @@ function on_msg(t,p)
     (t,p)
 end
 
-@testset "topic_wildcard_len_check" begin
-    @test_throws MQTTException topic_wildcard_len_check("+")
-    @test topic_wildcard_len_check("foo") == nothing
-    @test_throws MQTTException topic_wildcard_len_check("#")
-    @test_throws MQTTException topic_wildcard_len_check("")
-end;
-
-@testset "filter_wildcard_len_check" begin
-    @test_throws MQTTException filter_wildcard_len_check("")
-    @test_throws MQTTException filter_wildcard_len_check("#/")
-    @test_throws MQTTException filter_wildcard_len_check("f+oo/bar/more")
-    @test_throws MQTTException filter_wildcard_len_check("f#oo/bar/more")
-    @test filter_wildcard_len_check("foo/bar/more") == nothing
-    @test filter_wildcard_len_check("foo/bar/more/#") == nothing
-    @test filter_wildcard_len_check("foo/+/bar/more") == nothing
-end;
-
-@testset "packet struct" begin
-    p = MQTTClient.Packet(MQTTClient.CONNECT, rand(UInt8, 32))
-    @test p.cmd == MQTTClient.CONNECT
-end
-
-@testset "mqtt distributed channel" begin
-    ch = MQTTClient.@mqtt_channel
-    a = MQTTClient.Packet(MQTTClient.PINGREQ, rand(UInt8, 16))
-    put!(ch, a)
-    b = take!(ch)
-    @test a == b
-end
-
-
 @testset verbose = true "MQTT Client functionality" begin
     @testset "Client" begin
-        c = MQTTConnection()
+        c = MQTTClient.Client()
         @test c.on_msg isa Dict
         @test c.keep_alive == 0x0000
         @test c.last_id == 0x0000
         @test isempty(c.in_flight)
         @test c.write_packets isa AbstractChannel
-        @test c.socket isa TCPSocket
+        @test isnothing(c.socket)
         @test c.socket_lock isa ReentrantLock
-        @test c.ping_timeout == 60
+        @test c.ping_timeout == UInt64(60)
         @test c.ping_outstanding[] == 0
         # Test custom ping_timeout value
         ping_timeout = UInt64(30)
-        c2 = MQTTConnection(ping_timeout=ping_timeout)
+        c2 = MQTTClient.Client(ping_timeout)
         @test c2.ping_timeout == ping_timeout
         # Test that last_sent and last_received are initialized to NaN
         @test c2.last_sent.value == 0
@@ -72,23 +41,76 @@ end
         @test msg.topic == "test"
         @test msg.payload == [UInt8('p'), UInt8('a'), UInt8('y'), UInt8('l'), UInt8('o'), UInt8('a'), UInt8('d')]
     end
+end
 
+@testset verbose = true "MQTT Connection functionality" begin
+    @testset "MQTT TCP Connection from ip" begin
+        conn = MQTTClient.MQTTConnection(MQTTClient.IOConnection(localhost, 1883))
+        @test conn.protocol isa MQTTClient.TCP
+        @test conn.protocol.ip == localhost
+        @test conn.keep_alive == 32
+        @test length(conn.client_id) == 8
+        @test conn.user == MQTTClient.User("", "")
+        @test conn.will == MQTTClient.Message(false, 0x00, false, "", UInt8[])
+        @test conn.clean_session == true
+    end
+
+    @testset "MQTT TCP Connection from string" begin
+        conn = MQTTClient.MQTTConnection(MQTTClient.IOConnection("localhost", 1883))
+        @test conn.protocol isa MQTTClient.TCP
+        @test conn.protocol.ip == getaddrinfo("localhost")
+        @test conn.keep_alive == 32
+        @test length(conn.client_id) == 8
+        @test conn.user == MQTTClient.User("", "")
+        @test conn.will == MQTTClient.Message(false, 0x00, false, "", UInt8[])
+        @test conn.clean_session == true
+    end
+
+    @testset "MQTT UDS Connection" begin
+        path = "/tmp/mqtt.sock"
+        conn = MQTTClient.MQTTConnection(MQTTClient.IOConnection(path))
+        @test conn.protocol isa MQTTClient.UDS
+        @test conn.protocol.path == path
+        @test conn.keep_alive == 32
+        @test length(conn.client_id) == 8
+        @test conn.user == MQTTClient.User("", "")
+        @test conn.will == MQTTClient.Message(false, 0x00, false, "", UInt8[])
+        @test conn.clean_session == true
+    end
+end
+
+
+@testset verbose = true "MQTT interface functionality" begin
+    @testset "Make MQTT tcp connection" begin
+        c, conn = MQTTClient.MakeConnection("localhost", 1883)
+        @test c isa MQTTClient.Client
+        @test conn isa MQTTClient.MQTTConnection
+        c, conn = MQTTClient.MakeConnection(localhost, 1883)
+        @test c isa MQTTClient.Client
+        @test conn isa MQTTClient.MQTTConnection
+    end
+
+    @testset "Make MQTT uds connection" begin
+        c, conn = MQTTClient.MakeConnection("/tmp/mqtt.sock")
+        @test c isa MQTTClient.Client
+        @test conn isa MQTTClient.MQTTConnection
+    end
 
     @testset "MQTT subscribe async" begin
-        c = MQTTConnection()
+        c = MQTTClient.Client()
         fut = MQTTClient.subscribe_async(c, "test-topic/#", ((p) -> p), qos=MQTTClient.QOS_2)
         @test fut isa Distributed.Future
     end
 
     @testset "MQTT publish async" begin
-        c = MQTTConnection()
+        c = MQTTClient.Client()
         fut = MQTTClient.publish_async(c, "test-topic/mqtt_jl", "test message")
         @test fut isa Distributed.Future
     end
 
     @testset "unsubscribe_async" begin
         # Create a mock client object
-        client = MQTTConnection()
+        client = MQTTClient.Client()
 
         client.on_msg["topic1"] = ((p) -> p)
 
@@ -124,7 +146,7 @@ end
 
 @testset verbose=true "handlers" begin
     @testset "handle_connack" begin
-        c = MQTTConnection()
+        c = MQTTClient.Client()
         c.in_flight[0x0000] = Future()
 
         # Test successful connection
@@ -144,11 +166,12 @@ end
     end
 
     @testset "handle_publish" begin
-        c = MQTTConnection()
+        #! TODO: fix this test.
+        c = MQTTClient.Client()
         ch = Channel()
         c.on_msg["test1"] = (p) -> put!(ch, p == "payload1")
-        c.on_msg["test1"] = (p) -> put!(ch, p == "payload2")
-        c.on_msg["test1"] = (p) -> put!(ch, p == "payload3")
+        c.on_msg["test2"] = (p) -> put!(ch, p == "payload2")
+        c.on_msg["test3"] = (p) -> put!(ch, p == "payload3")
 
         # Test QoS 0
         io = IOBuffer(UInt8[0x00, 0x04, 0x74, 0x65, 0x73, 0x74, 0x70, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64, 0x31])
@@ -168,7 +191,7 @@ end
     end
 
     @testset "handle_ack" begin
-        c = MQTTConnection()
+        c = MQTTClient.Client()
         c.in_flight[0x0001] = Future()
 
         # Test successful ack
@@ -178,7 +201,7 @@ end
     end
 
     @testset "handle_pubrec" begin
-        c = MQTTConnection()
+        c = MQTTClient.Client()
         s = IOBuffer()
 
         # Set the cmd and flags values
@@ -197,7 +220,7 @@ end
     end
 
     @testset "handle_pubrel" begin
-        c = MQTTConnection()
+        c = MQTTClient.Client()
         s = IOBuffer()
 
         # Set the cmd and flags values
@@ -215,7 +238,7 @@ end
     end
 
     @testset "handle_suback" begin
-        c = MQTTConnection()
+        c = MQTTClient.Client()
         s = IOBuffer()
 
         # Set the cmd and flags values
@@ -238,7 +261,7 @@ end
     end
 
     @testset "handle_pingresp" begin
-        c = MQTTConnection()
+        c = MQTTClient.Client()
         s = IOBuffer()
 
         # Set the cmd and flags values

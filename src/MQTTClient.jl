@@ -1,24 +1,28 @@
 module MQTTClient
 
 using Distributed: Future, RemoteChannel
-using Dagger
-using Sockets: TCPSocket, PipeServer
+using Sockets: TCPSocket, IPAddr, PipeServer, getaddrinfo
 import Sockets: connect
 using Random: randstring
 import Base: ReentrantLock, lock, unlock, convert
 using Base.Threads
 
+
 include("utils.jl")
+include("internals.jl")
 include("client.jl")
+include("connection.jl")
 include("handlers.jl")
 include("interface.jl")
-# include("precompile.jl")
+
+VERSION > v"1.8" ? include("precompile.jl") : @debug "PrecompileTools is most useful in versions 1.9+. $VERSION is too old, explicit precompile is not being used."
 
 export
+    MakeConnection,
     Client,
     MQTTConnection,
-    TCPConnection,
-    UDSConnection,
+    IOConnection,
+    MQTTException,
     User,
     QOS_0,
     QOS_1,

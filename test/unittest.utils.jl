@@ -1,3 +1,33 @@
+@testset "topic_wildcard_len_check" begin
+    @test_throws MQTTException topic_wildcard_len_check("+")
+    @test topic_wildcard_len_check("foo") == nothing
+    @test_throws MQTTException topic_wildcard_len_check("#")
+    @test_throws MQTTException topic_wildcard_len_check("")
+end;
+
+@testset "filter_wildcard_len_check" begin
+    @test_throws MQTTException filter_wildcard_len_check("")
+    @test_throws MQTTException filter_wildcard_len_check("#/")
+    @test_throws MQTTException filter_wildcard_len_check("f+oo/bar/more")
+    @test_throws MQTTException filter_wildcard_len_check("f#oo/bar/more")
+    @test filter_wildcard_len_check("foo/bar/more") == nothing
+    @test filter_wildcard_len_check("foo/bar/more/#") == nothing
+    @test filter_wildcard_len_check("foo/+/bar/more") == nothing
+end;
+
+@testset "packet struct" begin
+    p = MQTTClient.Packet(MQTTClient.CONNECT, rand(UInt8, 32))
+    @test p.cmd == MQTTClient.CONNECT
+end
+
+@testset "mqtt distributed channel" begin
+    ch = MQTTClient.@mqtt_channel
+    a = MQTTClient.Packet(MQTTClient.PINGREQ, rand(UInt8, 16))
+    put!(ch, a)
+    b = take!(ch)
+    @test a == b
+end
+
 @testset "mqtt_read" begin
     io = IOBuffer()
     write(io, hton(UInt16(0x1234)))

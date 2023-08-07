@@ -1,241 +1,25 @@
-## Consts
-## ------
-# command consts
-const CONNECT = 0x10
-const CONNACK = 0x20
-const PUBLISH = 0x30
-const PUBACK = 0x40
-const PUBREC = 0x50
-const PUBREL = 0x60
-const PUBCOMP = 0x70
-const SUBSCRIBE = 0x80
-const SUBACK = 0x90
-const UNSUBSCRIBE = 0xA0
-const UNSUBACK = 0xB0
-const PINGREQ = 0xC0
-const PINGRESP = 0xD0
-const DISCONNECT = 0xE0
-
-# connect return code consts
-const CONNECTION_ACCEPTED = 0x00
-const CONNECTION_REFUSED_UNACCEPTABLE_PROTOCOL_VERSION = 0x01
-const CONNECTION_REFUSED_IDENTIFIER_REJECTED = 0x02
-const CONNECTION_REFUSED_SERVER_UNAVAILABLE = 0x03
-const CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD = 0x04
-const CONNECTION_REFUSED_NOT_AUTHORIZED = 0x05
-
-# error consts
-const CONNACK_ERRORS = Dict{UInt8, String}(
-                                           0x01 => "connection refused unacceptable protocol version",
-                                           0x02 => "connection refused identifier rejected",
-                                           0x03 => "connection refused server unavailable",
-                                           0x04 => "connection refused bad user name or password",
-                                           0x05 => "connection refused not authorized",
-                                          )
-
-## Enums
-## -----
-# QOS values
-@enum(QOS::UInt8,
-      QOS_0 = 0x00,
-      QOS_1 = 0x01,
-      QOS_2 = 0x02)
-
-# connection values
-@enum(CONN::UInt8,
-      TCP = 0x00, # transmission control protocol
-      UDS = 0x01) # unix domain socket
-
-
-## Structs
-## -------
-
 """
-    struct MQTTException <: Exception
-        msg::AbstractString
-    end
+    Client
 
-    A custom exception type for MQTT errors.
+A mutable struct representing an MQTT client.
 
-    # Examples
-    ```julia-repl
-    julia> throw(MQTTException(\"Connection refused: Not authorized\"))
-    MQTTException(\"Connection refused: Not authorized\")
-    ```
-"""
-struct MQTTException <: Exception
-    msg::AbstractString
-end
-
-"""
-    Packet
-
-A composite type representing a packet.
+An MQTT client is any device (from a microcontroller up to a fully-fledged server) that runs an MQTT library and connects to an MQTT broker over a network. Information is organized in a hierarchy of topics.
 
 # Fields
+- `on_msg::Dict{String,Function}`: A dictionary mapping topic names to callback functions.
+- `keep_alive::UInt16`: The keep-alive time in seconds.
+- `last_id::UInt16`: The last packet identifier used.
+- `in_flight::Dict{UInt16, Future}`: A dictionary mapping packet identifiers to futures.
+- `write_packets::AbstractChannel`: A channel for writing packets.
+- `socket`: The socket used for communication with the broker.
+- `socket_lock`: A lock for synchronizing access to the socket.
+- `ping_timeout::UInt64`: The ping timeout in seconds.
+- `ping_outstanding::Atomic{UInt8}`: An atomic counter for the number of outstanding ping requests.
+- `last_sent::Atomic{Float64}`: An atomic float representing the timestamp of the last sent packet.
+- `last_received::Atomic{Float64}`: An atomic float representing the timestamp of the last received packet.
 
-- `cmd::UInt8`: an 8-bit unsigned integer representing the command.
-- `data::Any`: any value representing the data.
-
-"""
-struct Packet
-    cmd::UInt8
-    data::Any
-end
-
-"""
-    Message
-
-A composite type representing a message.
-
-# Fields
-
-- `dup::Bool`: a boolean indicating whether the message is a duplicate.
-- `qos::UInt8`: an 8-bit unsigned integer representing the quality of service.
-- `retain::Bool`: a boolean indicating whether the message should be retained.
-- `topic::String`: a string representing the topic.
-- `payload::Array{UInt8}`: an array of 8-bit unsigned integers representing the payload.
-
-# Constructors
-
-- `Message(qos::QOS, topic::String, payload...)`: constructs a new message with default values for `dup` and `retain`.
-- `Message(dup::Bool, qos::QOS, retain::Bool, topic::String, payload...)`: constructs a new message with all fields specified.
-- `Message(dup::Bool, qos::UInt8, retain::Bool, topic::String, payload...)`: constructs a new message with all fields specified.
-
-"""
-struct Message
-    dup::Bool
-    qos::UInt8
-    retain::Bool
-    topic::String
-    payload::Array{UInt8}
-
-    function Message(qos::QOS, topic::String, payload...)
-        return Message(false, UInt8(qos), false, topic, payload...)
-    end
-
-    function Message(dup::Bool, qos::QOS, retain::Bool, topic::String, payload...)
-        return Message(dup, UInt8(qos), retain, topic, payload...)
-    end
-
-    function Message(dup::Bool, qos::UInt8, retain::Bool, topic::String, payload...)
-        # Convert payload to UInt8 Array with PipeBuffer
-        buffer = PipeBuffer()
-        for i in payload
-            write(buffer, i)
-        end
-        encoded_payload = take!(buffer)
-        return new(dup, qos, retain, topic, encoded_payload)
-    end
-end
-
-"""
-    User(name::String, password::String)
-
-A struct that represents a user with a name and password.
-
-# Examples
-```julia
-julia> user = User("John", "password")
-User("John", "password")
-```
-"""
-struct User
-    name::String
-    password::String
-end
-
-"""
-    AbstractConnection
-
-    Base Connection type
-"""
-abstract type AbstractConnection end
-
-"""
-    TCPConnection(host::AbstractString, port::Integer)
-
-    A struct that represents a transport control protocol socket connection.
-
-# Examples
-```julia
-julia> conn = TCPConnection("localhost", 1883)
-TCPConnection(MQTTClient.TCP, "localhost", 1883)
-```
-"""
-mutable struct TCPConnection <: AbstractConnection
-
-    type::CONN
-    host::String
-    port::Int
-
-    TCPConnection() = new(
-        TCP,
-        "localhost",
-        8883
-       )
-    
-    TCPConnection(host::AbstractString, port::Int) = new(
-        TCP,
-        host,
-        port
-       )
-end
-
-"""
-    UDSConnection(host::AbstractString, port::Integer)
-
-    A struct that represents a unix domain socket connection.
-
-# Examples
-```julia
-julia> conn = UDSConnection("/tmp/mqtt/mqtt.sock")
-UDSConnection(MQTTClient.UDS, "/tmp/mqtt/mqtt.sock")
-```
-"""
-mutable struct UDSConnection <: AbstractConnection
-    type::CONN
-    path::String
-
-    UDSConnection() = new(
-        UDS,
-        pwd()
-       )
-    
-    UDSConnection(path::AbstractString) = new(
-        UDS,
-        path
-       )
-
-end
-
-"""
-    Client([ping_timeout::UInt64])
-
-A mutable struct that represents an MQTT client.
-
-# Arguments
-- `ping_timeout::UInt64`: The number of seconds to wait for a ping response before disconnecting. Default is 60.
-- `path::AbstractString`: The path to the unix domain socket created by the broker.
-
-# Fields
-- `on_msg::Dict{String,Function}`: A dictionary of functions that will be called when a message is received.
-- `keep_alive::UInt16`: The number of seconds between pings.
-- `last_id::UInt16`: The last message ID used.
-- `in_flight::Dict{UInt16, Future}`: A dictionary of messages that are waiting for a response.
-- `write_packets::AbstractChannel`: A channel for writing packets to the socket.
-- `socket`: The socket used for communication.
-- `socket_lock`: A lock for the socket.
-- `ping_timeout::UInt64`: The number of seconds to wait for a ping response before disconnecting.
-- `ping_outstanding::Atomic{UInt8}`: A flag indicating whether a ping has been sent but not yet received.
-- `last_sent::Atomic{Float64}`: The time the last packet was sent.
-- `last_received::Atomic{Float64}`: The time the last packet was received.
-
-# Examples
-```julia
-julia> client = Client()
-julia> client = Client("/tmp/mqtt/mqtt.sock")
-```
+# Constructor
+`Client(ping_timeout::UInt64=UInt64(60))` constructs a new `Client` object with the specified ping timeout (default: 60 seconds).
 """
 mutable struct Client
 
@@ -257,39 +41,13 @@ mutable struct Client
     last_sent::Atomic{Float64}
     last_received::Atomic{Float64}
 
-    Client() = new(
+    Client(ping_timeout::UInt64=UInt64(60)) = new(
             Dict{String,Function}(),
             0x0000,
             0x0000,
             Dict{UInt16, Future}(),
             (@mqtt_channel),
-            TCPSocket(),
-            ReentrantLock(),
-            60,
-            Atomic{UInt8}(0),
-            Atomic{Float64}(),
-            Atomic{Float64}())
-
-    Client(ping_timeout::UInt64) = new(
-            Dict{String,Function}(),
-            0x0000,
-            0x0000,
-            Dict{UInt16, Future}(),
-            (@mqtt_channel),
-            TCPSocket(),
-            ReentrantLock(),
-            ping_timeout,
-            Atomic{UInt8}(0),
-            Atomic{Float64}(),
-            Atomic{Float64}())
-    
-    Client(path::AbstractString, ping_timeout::UInt64 = UInt64(60)) = new(
-            Dict{String,Function}(),
-            0x0000,
-            0x0000,
-            Dict{UInt16, Future}(),
-            (@mqtt_channel),
-            PipeServer(),
+            nothing,
             ReentrantLock(),
             ping_timeout,
             Atomic{UInt8}(0),

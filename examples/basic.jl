@@ -1,9 +1,8 @@
-module Basic
-
-include("../src/MQTT.jl")
-using .MQTT
+using MQTTClient
 
 broker = "test.mosquitto.org"
+topic = "jl/example"
+payload = "Hello World!"
 
 # Define the callback for receiving messages.
 function on_msg(topic, payload)
@@ -11,22 +10,25 @@ function on_msg(topic, payload)
 end
 
 # Instantiate a client.
-client = Client(on_msg)
-connect(client, broker)
+client, connection = MakeConnection(broker,1883)
 
-# Set retain to true so we can receive a message from the broker once we subscribe
-# to this topic.
-publish(client, "jlExample", "Hello World!", retain=true)
+connect(client, connection)
+println("connected to $client at $(connection.protocol)")
 
-# Subscribe to the topic we sent a retained message to.
-subscribe(client, ("jlExample", QOS_1))
+# Subscribe to the topic.
+subscribe(client, topic, on_msg, qos=QOS_2)
+println("subscribed to $topic")
+
+sleep(0.5)
+
+publish(client, topic, payload, qos=QOS_2)
+println("published $payload to $topic")
 
 # Unsubscribe from the topic
-unsubscribe(client, "jlExample")
+unsubscribe(client, topic)
+println("unsubscribed from $topic")
 
 # Disconnect from the broker. Not strictly needed as the broker will also
 # disconnect us if the socket is closed. But this is considered good form
 # and needed if you want to resume this session later.
 disconnect(client)
-
-end # module

@@ -1,37 +1,4 @@
 """
-    @dispatch(ex)
-
-A macro that dispatches the execution of an expression `ex` asynchronously.
-
-If the number of threads is equal to 1, it uses the `@async` macro to execute the expression asynchronously.
-
-If the number of threads is greater than 1, it uses the `Dagger.@spawn` macro to execute the expression asynchronously.
-
-If the number of threads is not valid, it throws an exception.
-
-# Examples
-```julia
-julia> @dispatch println("Hello, World!")
-Task (done) @0x00007f8c3e8a1010
-
-julia> @dispatch begin
-           sleep(1)
-           println("Hello, World!")
-       end
-Task (done) @0x00007f8c3e8a1010
-```
-"""
-macro dispatch(ex)
-    if Threads.nthreads() == 1
-        return :(@async $(esc(ex)))
-    elseif Threads.nthreads() > 1
-        return :(Dagger.@spawn $(esc(ex)))
-    else
-        return :(throw(Exception("Threads are not valid")))
-    end
-end
-
-"""
     mqtt_channel(len::Number=128)
 
 A macro that declares a data channel based on the number of threads available.
@@ -47,8 +14,35 @@ Otherwise, it returns a `Channel{Packet}` of length `len`.
 @mqtt_channel 64  # Returns a Channel{Packet} of length 64
 ```
 """
+# Disabled for now until a scheduler can be configured properly
+# macro mqtt_channel(len::Number=128)
+#     return Threads.nthreads() > 1 ? :(RemoteChannel(()->Channel{Packet}($len))) : :(Channel{Packet}($len))
+# end
 macro mqtt_channel(len::Number=128)
-    return Threads.nthreads() > 1 ? :(RemoteChannel(()->Channel{Packet}($len))) : :(Channel{Packet}($len))
+    return :(Channel{Packet}($len))
+end
+
+"""
+    topic_eq(baseT::String, compareT::String)
+
+A macro that compares two MQTT topics and returns a boolean value based on their equality. If the `baseT` topic contains a wildcard character `#`, the macro checks if the `compareT` topic contains the string before the wildcard character. Otherwise, it checks if the two topics are equal.
+
+# Examples
+```julia
+julia> @topic_eq "sport/#" "sport/tennis"
+true
+
+julia> @topic_eq "sport/tennis" "sport/football"
+false
+```
+"""
+function topic_eq(baseT, compareT)
+   if contains(baseT, "#")
+       T = split(baseT, "#")[1]
+       return contains(compareT, T)
+   else
+       return baseT == compareT
+   end
 end
 
 mqtt_read(s::IO, ::Type{UInt16}) = ntoh(read(s, UInt16))
@@ -102,14 +96,20 @@ function read_len(s::IO)
     return value
 end
 
-# the docs make it sound like fetch would alrdy work in this way
-# check julia sources
+"""
+    resolve(future)
+
+Fetch the result of a `Future` object and return it. If the result is an exception, throw the exception, otherwise return the result.
+
+# Arguments
+- `future`: The `Future` object to fetch the result from.
+
+# Returns
+- The result of the `Future`, or throws an exception if the result is an exception.
+"""
 function resolve(future)
     r = fetch(future)
-    if typeof(r) <: Exception
-        throw(r)
-    end
-    return r
+    return (typeof(r) <: Exception) ? throw(r) : r
 end
 
  # Helper method to check if it is possible to subscribe to a topic
