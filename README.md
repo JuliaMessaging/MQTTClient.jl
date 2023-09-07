@@ -24,6 +24,8 @@ This package is developed and sponsored by [MapXact](https://mapxact.com/) and i
 
 ## Contributing
 
+This package is using [MQTT protocol v3.1.1](https://docs.oasis-open.org/mqtt/mqtt/v3.1.1/mqtt-v3.1.1.html).
+
 If you would like to contribute to the project, please submit a PR. All contributions are welcomed and appreciated.
 
 This work is based on the MQTT.jl packages created by [femtomic](https://github.com/femtomc/MQTT.jl) and [rweilbacher](https://github.com/rweilbacher/MQTT.jl), and a lot of credit is due to their work along with the other contributors to those repositories.
@@ -43,3 +45,4 @@ This work is based on the MQTT.jl packages created by [femtomic](https://github.
     * the reconnect should still work
 - [ ] implement clean session = false
 - [ ] investigate adding global on_msg handler option back
+- [ ] investigate using MQTT v5.0

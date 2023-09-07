@@ -4,7 +4,7 @@ using Distributed: Future, myid, remotecall
 using Sockets: TCPSocket, IPAddr, PipeServer, getaddrinfo
 import Sockets: connect
 using Random: randstring
-import Base: ReentrantLock, lock, unlock, convert, PipeEndpoint
+import Base: ReentrantLock, lock, unlock, convert, PipeEndpoint, isready
 using Base.Threads
 
 

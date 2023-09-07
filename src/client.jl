@@ -29,7 +29,7 @@ mutable struct Client{T}
     on_msg::Dict{String,Function}
     keep_alive::UInt16
 
-    # TODO mutex?
+    data_lock::ReentrantLock
     last_id::UInt16
     in_flight::Dict{UInt16, Future}
 
@@ -39,10 +39,9 @@ mutable struct Client{T}
 
     ping_timeout::UInt64
 
-    # TODO remove atomic? replace with @atomic?
-    ping_outstanding::Atomic{UInt8}
-    last_sent::Atomic{Float64}
-    last_received::Atomic{Float64}
+    @atomic ping_outstanding::UInt8
+    @atomic last_sent::Float64
+    @atomic last_received::Float64
 
     write_task::Union{Nothing,Task}
     read_task::Union{Nothing,Task}
@@ -53,16 +52,17 @@ mutable struct Client{T}
             :ready,
             nothing,
             Dict{String,Function}(),
-            0x0000,
+            0x0020,
+            ReentrantLock(),
             0x0000,
             Dict{UInt16, Future}(),
             Channel{Packet}(typemax(Int64)),
             nothing,
             ReentrantLock(),
             ping_timeout,
-            Atomic{UInt8}(0),
-            Atomic{Float64}(),
-            Atomic{Float64}(),
+            0,
+            0.0,
+            0.0,
             nothing,
             nothing,
             nothing)
@@ -96,7 +96,7 @@ function write_loop(client)
             write_len(client.socket, length(data))
             write(client.socket, data)
             unlock(client.socket_lock)
-            atomic_xchg!(client.last_sent, time())
+            @atomic client.last_sent = time()
         end
     catch e
         # channel closed
@@ -132,7 +132,7 @@ function read_loop(client)
             flags = cmd_flags & 0x0F
 
             if haskey(HANDLERS, cmd)
-                atomic_xchg!(client.last_received, time())
+                @atomic client.last_received = time()
                 HANDLERS[cmd](client, buffer, cmd, flags)
             else
                 # TODO unexpected cmd protocol error
@@ -162,15 +162,15 @@ function keep_alive_loop(client::Client)
     timer = Timer(0, interval=check_interval)
 
     while !isdone(client)
-        if time() - client.last_sent[] >= client.keep_alive || time() - client.last_received[] >= client.keep_alive
-            if client.ping_outstanding[] == 0x0
-                atomic_xchg!(client.ping_outstanding, 0x1)
+        if time() - lastsent(client) >= client.keep_alive || time() - lastreceived(client) >= client.keep_alive
+            if !ispingoutstanding(client)
+                @atomic client.ping_outstanding = 0x1
                 try
                     lock(client.socket_lock)
                     write(client.socket, PINGREQ)
                     write(client.socket, 0x00)
                     unlock(client.socket_lock)
-                    atomic_xchg!(client.last_sent, time())
+                    @atomic client.last_sent = time()
                 catch e
                     if isa(e, InvalidStateException)
                         break
@@ -183,7 +183,7 @@ function keep_alive_loop(client::Client)
             end
         end
 
-        if client.ping_outstanding[] == 1 && time() - ping_sent >= client.ping_timeout
+        if ispingoutstanding(client) && time() - ping_sent >= client.ping_timeout
             try # No pingresp received
                 disconnect(client)
                 break
@@ -202,13 +202,17 @@ function keep_alive_loop(client::Client)
     end
 end
 
-# TODO needs mutex
 function packet_id(client::Client)
-    if client.last_id == typemax(UInt16)
-        client.last_id = 0
+    lock(client.data_lock)
+    try
+        if client.last_id == typemax(UInt16)
+            client.last_id = 0
+        end
+        client.last_id += 1
+        return client.last_id
+    finally
+        unlock(client.data_lock)
     end
-    client.last_id += 1
-    return client.last_id
 end
 
 # write packet to mqtt broker
@@ -216,9 +220,16 @@ function write_packet(client::Client, cmd::UInt8, data...)
     put!(client.write_packets, Packet(cmd, data))
 end
 
+lock(c::Client) = lock.([c.cond_state, c.data_lock, c.socket_lock])
+unlock(c::Client) = unlock.([c.cond_state, c.data_lock, c.socket_lock])
+
 isready(c::Client) = ((@atomic :monotonic c.state) === :ready)
 isconnected(c::Client) = ((@atomic :monotonic c.state) === :connected)
 isdone(c::Client) = ((@atomic :monotonic c.state) === :done)
 isfailed(c::Client) = ((@atomic :monotonic c.state) === :error)
+
+ispingoutstanding(c::Client) = ((@atomic :monotonic c.ping_outstanding) === 0x01)
+lastsent(c::Client) = (@atomic :monotonic c.last_sent)
+lastreceived(c::Client) = (@atomic :monotonic c.last_received)
 
 Base.show(io::IO, client::Client{D}) where D = print(io, "MQTTClient(State: $(client.state), Data Transportation Method: $D, Topic Subscriptions: $(collect(keys(client.on_msg))))")

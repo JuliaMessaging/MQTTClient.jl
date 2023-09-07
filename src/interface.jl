@@ -157,7 +157,9 @@ function connect_async(client::Client, connection::MQTTConnection)::Future
     end
 
     future = Future()
+    lock(client.data_lock)
     client.in_flight[0x0000] = future
+    unlock(client.data_lock)
 
     write_packet(client, CONNECT,
                  protocol_name,
@@ -191,7 +193,6 @@ This function is a wrapper around the `connect_async` function, which establishe
 """
 connect(client::Client, connection::MQTTConnection) = resolve(connect_async(client, connection))
 
-
 """
     disconnect(client::Client)
 
@@ -200,7 +201,7 @@ Disconnects the client from the broker and stops the tasks.
 function disconnect(client::Client)::Nothing
     write_packet(client, DISCONNECT)
     mqtt_close(client)
-    fetch.([client.write_task, client.read_task, client.keep_alive_task])
+    fetch.([client.keep_alive_task, client.read_task, client.write_task])
     lock(client.socket_lock)
     try
         close(client.write_packets)
@@ -231,8 +232,7 @@ end
 Establishes a connection to an MQTT Broker with a client that has previously been connected (is in :done state)
 """
 function reconnect_async(client::Client{T}, connection::MQTTConnection) where T
-    lock(client.cond_state)
-    lock(client.socket_lock)
+    lock(client)
     try
         @atomic :release client.state = :ready
         client.keep_alive = 0x0020
@@ -240,15 +240,14 @@ function reconnect_async(client::Client{T}, connection::MQTTConnection) where T
         client.in_flight = Dict{UInt16, Future}()
         client.write_packets = Channel{Packet}(typemax(Int64))
         client.socket = nothing
-        client.ping_outstanding = Atomic{UInt8}(0)
-        client.last_sent = Atomic{Float64}()
-        client.last_received = Atomic{Float64}()
+        @atomic client.ping_outstanding = 0
+        @atomic client.last_sent = 0.0
+        @atomic client.last_received = 0.0
         client.write_task = nothing
         client.read_task = nothing
         client.keep_alive_task = nothing
     finally
-        unlock(client.cond_state)
-        unlock(client.socket_lock)
+        unlock(client)
     end
     return connect_async(client, connection)
 end
@@ -281,7 +280,9 @@ future = subscribe_async(client, "my/topic", on_msg, qos=QOS_2)
 function subscribe_async(client::Client, topic::String, on_msg::Function; qos=QOS_0)
     future = Future()
     id = packet_id(client)
+    lock(client.data_lock)
     client.in_flight[id] = future
+    unlock(client.data_lock)
     write_packet(client, SUBSCRIBE | 0x02, id, topic, qos)
     client.on_msg[topic] = on_msg
     return future
@@ -316,7 +317,9 @@ Returns a `Future` object that contains `nothing` on success and an exception on
 function unsubscribe_async(client::Client, topics::String...)
     future = Future()
     id = packet_id(client)
+    lock(client.data_lock)
     client.in_flight[id] = future
+    unlock(client.data_lock)
     topic_data = []
     write_packet(client, UNSUBSCRIBE | 0x02, id, topics...)
     ((t) -> delete!(client.on_msg, t)).(topics)
@@ -345,7 +348,9 @@ function publish_async(client::Client, message::Message)
     elseif message.qos == 0x01 || message.qos == 0x02
         future = Future()
         id = packet_id(client)
+        lock(client.data_lock)
         client.in_flight[id] = future
+        unlock(client.data_lock)
         optional = (id)
     else
         throw(MQTTException("invalid qos"))

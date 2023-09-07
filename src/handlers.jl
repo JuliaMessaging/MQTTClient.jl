@@ -19,7 +19,9 @@ function handle_connack(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     session_present = read(s, UInt8)
     return_code = read(s, UInt8)
 
+    lock(client.data_lock)
     future = client.in_flight[0x0000]
+    unlock(client.data_lock)
     if return_code == CONNECTION_ACCEPTED
         put!(future, session_present)
     else
@@ -68,12 +70,17 @@ end
 function handle_ack(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     id = mqtt_read(s, UInt16)
     # TODO move this to its own function
-    if haskey(client.in_flight, id)
-        future = client.in_flight[id]
-        put!(future, nothing)
-        delete!(client.in_flight, id)
-    else
-        # TODO unexpected ack protocol error
+    lock(client.data_lock)
+    try
+        if haskey(client.in_flight, id)
+            future = client.in_flight[id]
+            put!(future, nothing)
+            delete!(client.in_flight, id)
+        else
+            # TODO unexpected ack protocol error
+        end
+    finally
+        unlock(client.data_lock)
     end
 end
 
@@ -90,12 +97,17 @@ end
 function handle_suback(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     id = mqtt_read(s, UInt16)
     return_codes = take!(s)
-    put!(client.in_flight[id], return_codes)
+    lock(client.data_lock)
+    try
+        put!(client.in_flight[id], return_codes)
+    finally
+        unlock(client.data_lock)
+    end
 end
 
 function handle_pingresp(client::Client, s::IO, cmd::UInt8, flags::UInt8)
-    if client.ping_outstanding[] == 0x1
-        atomic_xchg!(client.ping_outstanding, 0x0)
+    if ispingoutstanding(client)
+        @atomic client.ping_outstanding = 0x0
     else
         # We received a subresp packet we didn't ask for
         disconnect(client)

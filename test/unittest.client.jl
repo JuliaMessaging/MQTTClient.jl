@@ -7,14 +7,14 @@ end
         c = MQTTClient.Client{TCPSocket}()
         @test c.state == :ready
         @test c.on_msg isa Dict
-        @test c.keep_alive == 0x0000
+        @test c.keep_alive == 0x0020
         @test c.last_id == 0x0000
         @test isempty(c.in_flight)
         @test c.write_packets isa AbstractChannel
         @test isnothing(c.socket)
         @test c.socket_lock isa ReentrantLock
         @test c.ping_timeout == UInt64(60)
-        @test c.ping_outstanding[] == 0
+        @test c.ping_outstanding == 0
         @test isnothing(c.write_task)
         @test isnothing(c.read_task)
         # Test custom ping_timeout value
@@ -22,8 +22,8 @@ end
         c2 = MQTTClient.Client{PipeEndpoint}(ping_timeout)
         @test c2.ping_timeout == ping_timeout
         # Test that last_sent and last_received are initialized to NaN
-        @test c2.last_sent.value == 0
-        @test c2.last_received.value == 0
+        @test c2.last_sent == 0
+        @test c2.last_received == 0
         @test isnothing(c.keep_alive_task)
     end
 
@@ -273,16 +273,17 @@ end
         flags = 0x00
 
         # Set the ping_outstanding value to 0x1
-        c.ping_outstanding[] = 0x1
+        @atomic c.ping_outstanding = 0x01
+        @test MQTTClient.ispingoutstanding(c)
 
         # Call the handle_pingresp function
         MQTTClient.handle_pingresp(c, s, cmd, flags)
 
         # Check that the ping_outstanding value was updated correctly
-        @test c.ping_outstanding[] == 0x0
+        @test !MQTTClient.ispingoutstanding(c)
 
         # Set the ping_outstanding value to 0x0 and call the handle_pingresp function again
-        c.ping_outstanding[] = 0x0
+        @atomic c.ping_outstanding = 0x00
         MQTTClient.handle_pingresp(c, s, cmd, flags)
         p = take!(c.write_packets)
         @test p == MQTTClient.Packet(MQTTClient.DISCONNECT, ())
