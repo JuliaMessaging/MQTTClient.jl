@@ -1,16 +1,16 @@
 print("\n"^3)
 
 ## TCP Protocol Smoke Test and Stress Test
-tcp_test_client, tcp_test_conn = MakeConnection(localhost, 1883)
+protocol = IOConnection(localhost, 1883)
 try
-    s = connect(tcp_test_conn.protocol)
+    s = connect(protocol)
     close(s)
-
     @testset "TCP Smoke tests" begin
         println("="^80)
         println("Running smoke tests against localhost[1883]")
         println("-"^80)
 
+        tcp_test_client, tcp_test_conn = MakeConnection(localhost, 1883)
         smoke_test(tcp_test_client, tcp_test_conn)
     end
 
@@ -19,11 +19,12 @@ try
         println("Running stress tests against localhost[1883]")
         println("-"^80)
 
+        tcp_test_client, tcp_test_conn = MakeConnection(localhost, 1883)
         stress_test(tcp_test_client, tcp_test_conn)
     end
 catch e
     if (e isa DNSError) || (e isa IOError)
-        println("$(tcp_test_conn.protocol.ip):$(tcp_test_conn.protocol.port) not online -- skipping smoke test")
+        println("$(protocol.ip):$(protocol.port) not online -- skipping smoke/stress test")
         @error e
     else
         rethrow(e)

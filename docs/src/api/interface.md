@@ -9,4 +9,8 @@ unsubscribe_async
 unsubscribe
 publish_async
 publish
+isready
+isconnected
+isdone
+iserror
 ```

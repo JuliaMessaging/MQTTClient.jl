@@ -4,7 +4,8 @@ end
 
 @testset verbose = true "MQTT Client functionality" begin
     @testset "Client" begin
-        c = MQTTClient.Client()
+        c = MQTTClient.Client{TCPSocket}()
+        @test c.state == :ready
         @test c.on_msg isa Dict
         @test c.keep_alive == 0x0000
         @test c.last_id == 0x0000
@@ -14,13 +15,16 @@ end
         @test c.socket_lock isa ReentrantLock
         @test c.ping_timeout == UInt64(60)
         @test c.ping_outstanding[] == 0
+        @test isnothing(c.write_task)
+        @test isnothing(c.read_task)
         # Test custom ping_timeout value
         ping_timeout = UInt64(30)
-        c2 = MQTTClient.Client(ping_timeout)
+        c2 = MQTTClient.Client{PipeEndpoint}(ping_timeout)
         @test c2.ping_timeout == ping_timeout
         # Test that last_sent and last_received are initialized to NaN
         @test c2.last_sent.value == 0
         @test c2.last_received.value == 0
+        @test isnothing(c.keep_alive_task)
     end
 
     @testset "MQTT Message" begin
@@ -97,20 +101,20 @@ end
     end
 
     @testset "MQTT subscribe async" begin
-        c = MQTTClient.Client()
+        c = MQTTClient.Client{TCPSocket}()
         fut = MQTTClient.subscribe_async(c, "test-topic/#", ((p) -> p), qos=MQTTClient.QOS_2)
         @test fut isa Distributed.Future
     end
 
     @testset "MQTT publish async" begin
-        c = MQTTClient.Client()
+        c = MQTTClient.Client{TCPSocket}()
         fut = MQTTClient.publish_async(c, "test-topic/mqtt_jl", "test message")
         @test fut isa Distributed.Future
     end
 
     @testset "unsubscribe_async" begin
         # Create a mock client object
-        client = MQTTClient.Client()
+        client = MQTTClient.Client{TCPSocket}()
 
         client.on_msg["topic1"] = ((p) -> p)
 
@@ -146,7 +150,7 @@ end
 
 @testset verbose=true "handlers" begin
     @testset "handle_connack" begin
-        c = MQTTClient.Client()
+        c = MQTTClient.Client{TCPSocket}()
         c.in_flight[0x0000] = Future()
 
         # Test successful connection
@@ -167,7 +171,7 @@ end
 
     @testset "handle_publish" begin
         #! TODO: fix this test.
-        c = MQTTClient.Client()
+        c = MQTTClient.Client{TCPSocket}()
         ch = Channel()
         c.on_msg["test1"] = (p) -> put!(ch, p == "payload1")
         c.on_msg["test2"] = (p) -> put!(ch, p == "payload2")
@@ -191,7 +195,7 @@ end
     end
 
     @testset "handle_ack" begin
-        c = MQTTClient.Client()
+        c = MQTTClient.Client{TCPSocket}()
         c.in_flight[0x0001] = Future()
 
         # Test successful ack
@@ -201,7 +205,7 @@ end
     end
 
     @testset "handle_pubrec" begin
-        c = MQTTClient.Client()
+        c = MQTTClient.Client{TCPSocket}()
         s = IOBuffer()
 
         # Set the cmd and flags values
@@ -220,7 +224,7 @@ end
     end
 
     @testset "handle_pubrel" begin
-        c = MQTTClient.Client()
+        c = MQTTClient.Client{TCPSocket}()
         s = IOBuffer()
 
         # Set the cmd and flags values
@@ -238,7 +242,7 @@ end
     end
 
     @testset "handle_suback" begin
-        c = MQTTClient.Client()
+        c = MQTTClient.Client{TCPSocket}()
         s = IOBuffer()
 
         # Set the cmd and flags values
@@ -261,7 +265,7 @@ end
     end
 
     @testset "handle_pingresp" begin
-        c = MQTTClient.Client()
+        c = MQTTClient.Client{TCPSocket}()
         s = IOBuffer()
 
         # Set the cmd and flags values

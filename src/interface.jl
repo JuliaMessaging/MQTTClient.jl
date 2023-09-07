@@ -85,15 +85,23 @@ Establishes an MQTT connection using the given IO connection.
 # Returns
 A tuple containing a `Client` object and an `MQTTConnection` object.
 """
-function MakeConnection(io::T,
+function MakeConnection(io::TCP,
         ping_timeout=UInt64(60),
         keep_alive::Int64=32,
         client_id::String=randstring(8),
         user::User=User("", ""),
         will::Message=Message(false, 0x00, false, "", UInt8[]),
-        clean_session::Bool=true)::Tuple where T <: AbstractIOConnection
-    return (Client(ping_timeout), MQTTConnection(io, keep_alive, client_id, user, will, clean_session))
-
+        clean_session::Bool=true)::Tuple
+    return (Client{TCPSocket}(ping_timeout), MQTTConnection(io, keep_alive, client_id, user, will, clean_session))
+end
+function MakeConnection(io::UDS,
+        ping_timeout=UInt64(60),
+        keep_alive::Int64=32,
+        client_id::String=randstring(8),
+        user::User=User("", ""),
+        will::Message=Message(false, 0x00, false, "", UInt8[]),
+        clean_session::Bool=true)::Tuple
+    return (Client{PipeEndpoint}(ping_timeout), MQTTConnection(io, keep_alive, client_id, user, will, clean_session))
 end
 
 
@@ -109,9 +117,8 @@ If the user name and password are provided in the `connection` object, they are 
 
 The function returns a `Future` object that can be used to track the progress of the connection.
 """
-function connect_async(client::Client, connection::MQTTConnection)
-
-    client.write_packets = @mqtt_channel
+function connect_async(client::Client, connection::MQTTConnection)::Future
+    client.write_packets = Channel{Packet}(typemax(Int64))
     try
         client.keep_alive = convert(UInt16, connection.keep_alive)
     catch
@@ -120,24 +127,18 @@ function connect_async(client::Client, connection::MQTTConnection)
 
     client.socket = connect(connection.protocol)
 
-    @debug "connect to host"
-    @async write_loop(client)
-    @async read_loop(client)
-    @debug "set backround procs"
+    client.write_task = Threads.@spawn write_loop(client)
+    client.read_task = Threads.@spawn read_loop(client)
 
     if client.keep_alive > 0x0000
-        @async keep_alive_loop(client)
+        client.keep_alive_task = Threads.@spawn keep_alive_loop(client)
     end
-
-    @debug "set keep alive"
 
     #TODO reset client on clean_session = true
 
     protocol_name = "MQTT"
     protocol_level = 0x04 # v3.1.1
     connect_flags = 0x02 # clean session
-
-    @debug "set protocol"
 
     local optional_user = ()
     local optional_will = ()
@@ -155,8 +156,6 @@ function connect_async(client::Client, connection::MQTTConnection)
         connect_flags |= 0x04 | ((connection.will.qos & 0x03) << 3) | ((connection.will.retain & 0x01) << 5)
     end
 
-    @debug "set optional fields"
-
     future = Future()
     client.in_flight[0x0000] = future
 
@@ -169,9 +168,17 @@ function connect_async(client::Client, connection::MQTTConnection)
                  optional_user...,
                  optional_will...)
 
-    @debug "write packets"
+    return remotecall(myid()) do
+        res = fetch(future)
 
-    return future
+        lock(client.cond_state)
+        try
+            @atomic :release client.state = :connected
+        finally
+            unlock(client.cond_state)
+        end
+        return res
+    end
 end
 
 
@@ -190,13 +197,67 @@ connect(client::Client, connection::MQTTConnection) = resolve(connect_async(clie
 
 Disconnects the client from the broker and stops the tasks.
 """
-function disconnect(client::Client)
+function disconnect(client::Client)::Nothing
     write_packet(client, DISCONNECT)
-    close(client.write_packets)
+    mqtt_close(client)
+    fetch.([client.write_task, client.read_task, client.keep_alive_task])
+    lock(client.socket_lock)
+    try
+        close(client.write_packets)
 
-    # FIXME: figure out what this does.
-    #wait(client.socket.closenotify)
+        if !isnothing(client.socket)
+            close(client.socket)
+        end
+    finally
+        unlock(client.socket_lock)
+    end
+    nothing
 end
+
+function mqtt_close(client)::Nothing
+    lock(client.cond_state)
+    try
+        notify(client.cond_state, nothing, true, false)
+        @atomic :release client.state = :done
+    finally
+        unlock(client.cond_state)
+    end
+    nothing
+end
+
+"""
+    reconnect_async(client::Client, connection::MQTTConnection)
+
+Establishes a connection to an MQTT Broker with a client that has previously been connected (is in :done state)
+"""
+function reconnect_async(client::Client{T}, connection::MQTTConnection) where T
+    lock(client.cond_state)
+    lock(client.socket_lock)
+    try
+        @atomic :release client.state = :ready
+        client.keep_alive = 0x0020
+        client.last_id = 0x0000
+        client.in_flight = Dict{UInt16, Future}()
+        client.write_packets = Channel{Packet}(typemax(Int64))
+        client.socket = nothing
+        client.ping_outstanding = Atomic{UInt8}(0)
+        client.last_sent = Atomic{Float64}()
+        client.last_received = Atomic{Float64}()
+        client.write_task = nothing
+        client.read_task = nothing
+        client.keep_alive_task = nothing
+    finally
+        unlock(client.cond_state)
+        unlock(client.socket_lock)
+    end
+    return connect_async(client, connection)
+end
+"""
+    reconnect(client::Client, connection::MQTTConnection)
+
+Establishes a connection to an MQTT Broker with a client that has previously been connected (is in :done state) synchronously
+"""
+reconnect(client::Client, connection::MQTTConnection) = resolve(reconnect_async(client::Client, connection::MQTTConnection))
 
 """
     subscribe_async(client::Client, topic::String, on_msg::Function; qos::UInt8=QOS_0)
@@ -217,7 +278,7 @@ Subscribe to a topic asynchronously.
 future = subscribe_async(client, "my/topic", on_msg, qos=QOS_2)
 ```
 """
-function subscribe_async(client, topic, on_msg; qos=QOS_0)
+function subscribe_async(client::Client, topic::String, on_msg::Function; qos=QOS_0)
     future = Future()
     id = packet_id(client)
     client.in_flight[id] = future

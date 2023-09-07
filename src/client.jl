@@ -21,7 +21,10 @@ An MQTT client is any device (from a microcontroller up to a fully-fledged serve
 # Constructor
 `Client(ping_timeout::UInt64=UInt64(60))` constructs a new `Client` object with the specified ping timeout (default: 60 seconds).
 """
-mutable struct Client
+mutable struct Client{T}
+    cond_state::Threads.Condition
+    @atomic state::Symbol                  # :ready, :connected, :done, :error
+    excp::Union{Exception, Nothing}      # exception to be thrown when state == :error
 
     on_msg::Dict{String,Function}
     keep_alive::UInt16
@@ -30,29 +33,39 @@ mutable struct Client
     last_id::UInt16
     in_flight::Dict{UInt16, Future}
 
-    write_packets::AbstractChannel
-    socket
-    socket_lock # TODO add type
+    write_packets::Channel{Packet}
+    socket::Union{T, Nothing}
+    socket_lock::ReentrantLock
 
     ping_timeout::UInt64
 
-    # TODO remove atomic?
+    # TODO remove atomic? replace with @atomic?
     ping_outstanding::Atomic{UInt8}
     last_sent::Atomic{Float64}
     last_received::Atomic{Float64}
 
-    Client(ping_timeout::UInt64=UInt64(60)) = new(
+    write_task::Union{Nothing,Task}
+    read_task::Union{Nothing,Task}
+    keep_alive_task::Union{Nothing,Task}
+
+    Client{T}(ping_timeout::UInt64=UInt64(60)) where { T <: AbstractProtocol } = new{T}(
+            Threads.Condition(ReentrantLock()),
+            :ready,
+            nothing,
             Dict{String,Function}(),
             0x0000,
             0x0000,
             Dict{UInt16, Future}(),
-            (@mqtt_channel),
+            Channel{Packet}(typemax(Int64)),
             nothing,
             ReentrantLock(),
             ping_timeout,
             Atomic{UInt8}(0),
             Atomic{Float64}(),
-            Atomic{Float64}())
+            Atomic{Float64}(),
+            nothing,
+            nothing,
+            nothing)
 end
 
 
@@ -71,7 +84,7 @@ Nothing.
 """
 function write_loop(client)
     try
-        while true
+        while !isdone(client)
             packet = take!(client.write_packets)
             buffer = PipeBuffer()
             for i in packet.data
@@ -110,7 +123,7 @@ read_loop(client)
 """
 function read_loop(client)
     try
-        while true
+        while !isdone(client)
             cmd_flags = read(client.socket, UInt8)
             len = read_len(client.socket)
             data = read(client.socket, len)
@@ -146,9 +159,9 @@ function keep_alive_loop(client::Client)
     else
         check_interval = client.keep_alive / 2
     end
-    timer = Timer(0, check_interval)
+    timer = Timer(0, interval=check_interval)
 
-    while true
+    while !isdone(client)
         if time() - client.last_sent[] >= client.keep_alive || time() - client.last_received[] >= client.keep_alive
             if client.ping_outstanding[] == 0x0
                 atomic_xchg!(client.ping_outstanding, 0x1)
@@ -190,7 +203,7 @@ function keep_alive_loop(client::Client)
 end
 
 # TODO needs mutex
-function packet_id(client)
+function packet_id(client::Client)
     if client.last_id == typemax(UInt16)
         client.last_id = 0
     end
@@ -202,3 +215,10 @@ end
 function write_packet(client::Client, cmd::UInt8, data...)
     put!(client.write_packets, Packet(cmd, data))
 end
+
+isready(c::Client) = ((@atomic :monotonic c.state) === :ready)
+isconnected(c::Client) = ((@atomic :monotonic c.state) === :connected)
+isdone(c::Client) = ((@atomic :monotonic c.state) === :done)
+isfailed(c::Client) = ((@atomic :monotonic c.state) === :error)
+
+Base.show(io::IO, client::Client{D}) where D = print(io, "MQTTClient(State: $(client.state), Data Transportation Method: $D, Topic Subscriptions: $(collect(keys(client.on_msg))))")

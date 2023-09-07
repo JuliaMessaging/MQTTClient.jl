@@ -3,8 +3,9 @@ using Test
 using MQTTClient
 using Distributed, Random
 
-import MQTTClient: topic_wildcard_len_check, filter_wildcard_len_check, MQTTException
+import MQTTClient: topic_wildcard_len_check, filter_wildcard_len_check, MQTTException, isready, isconnected, isdone
 import Sockets: TCPSocket, PipeServer, connect, localhost, getaddrinfo, IOError, DNSError
+import Base.PipeEndpoint
 
 @testset verbose=true "client tests" begin
     include("unittest.client.jl")

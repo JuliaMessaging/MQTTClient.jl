@@ -34,6 +34,15 @@ const CONNACK_ERRORS = Dict{UInt8, String}(
                                           )
 ## Types
 
+"""
+    AbstractIOConnection
+
+    Base Connection Protocol type
+"""
+abstract type AbstractIOConnection end
+
+AbstractProtocol = Union{PipeEndpoint, TCPSocket}
+
 ## Enums
 ## -----
 # QOS values

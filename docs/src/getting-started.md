@@ -25,7 +25,7 @@ using MQTTClient
 
 Advanced Usage
 --------------
-The _read_loop_, _write_loop_ _keep_alive_loop_, and _on_msg_ callback are all called as async processes via `@async`.
+The _read_loop_, _write_loop_ _keep_alive_loop_, and _on_msg_ callback are all called as async processes via `Threads.@spawn`.
 
 ## Getting started
 To use this library you need to follow at least these steps:

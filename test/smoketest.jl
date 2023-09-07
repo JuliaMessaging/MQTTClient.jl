@@ -1,4 +1,9 @@
 function smoke_test(client, conn)
+    show(conn)
+    println()
+    show(client)
+    println()
+
     condition = Condition()
     topic = "foo"
     payload = Random.randstring(20)
@@ -15,15 +20,35 @@ function smoke_test(client, conn)
         end
     end
 
-    client = Client()
-    println(client)
+    Distributed.remotecall(1) do
+        while true
+            wait(client.socket.cond)
+            println("+"^60)
+            println("condition was notified!")
+            println(client.state)
+            println("."^60)
+            println(client.socket)
+            println("."^60)
+            println(client)
+            println("+"^60)
+        end
+    end
+
+    @test isready(client)
 
     println("Testing reconnect")
     connect(client, conn)
+    @test isconnected(client)
+    println(client.state)
     sleep(0.05)
     disconnect(client)
+    @test isdone(client)
+    println(client.state)
     sleep(0.05)
-    connect(client, conn)
+    println("reconnecting!")
+    reconnect(client, conn)
+    @test isconnected(client)
+    println(client.state)
     sleep(0.05)
 
     @time "subscribe_async" subscribe_async(client, topic, on_msg, qos=QOS_2)
@@ -76,6 +101,11 @@ function smoke_test(client, conn)
 end
 
 function stress_test(client, conn)
+    show(conn)
+    println()
+    show(client)
+    println()
+
     condition = Condition()
     topic1 = "foo"
     topic2 = "bar"
@@ -92,10 +122,10 @@ function stress_test(client, conn)
         put!(client_test_res, (t,msg))
     end
 
-    client = Client()
-
     connect(client, conn)
     sleep(0.05)
+
+    println("connected!")
 
     @time "subscribe1" subscribe(client, topic1, on_msg, qos=QOS_2)
     @time "subscribe2" subscribe(client, topic2, on_msg, qos=QOS_2)
