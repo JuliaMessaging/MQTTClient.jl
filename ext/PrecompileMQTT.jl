@@ -1,3 +1,6 @@
+module PrecompileMQTT # Should be same name as the file (just like a normal package)
+
+using MQTTClient
 using PrecompileTools
 using Random
 
@@ -66,3 +69,5 @@ precompile(Tuple{typeof(Base.indexed_iterate), Tuple{Nothing, Int64}, Int64, Int
         disconnect(tcpclient)
     end
 end
+
+end # module
