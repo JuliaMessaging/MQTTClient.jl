@@ -1,10 +1,10 @@
 module MQTTClient
 
-using Distributed: Future, myid, remotecall
+using Distributed: Future, myid, remotecall, RemoteChannel
 using Sockets: TCPSocket, IPAddr, PipeServer, getaddrinfo
 import Sockets: connect
 using Random: randstring
-import Base: ReentrantLock, lock, unlock, convert, PipeEndpoint, isready
+import Base: ReentrantLock, lock, unlock, convert, PipeEndpoint, isready, Ref, RefValue, fetch
 using Base.Threads
 
 

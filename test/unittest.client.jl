@@ -10,7 +10,7 @@ end
         @test c.keep_alive == 0x0020
         @test c.last_id == 0x0000
         @test isempty(c.in_flight)
-        @test c.write_packets isa AbstractChannel
+        @test c.write_packets isa RemoteChannel
         @test isnothing(c.socket)
         @test c.socket_lock isa ReentrantLock
         @test c.ping_timeout == UInt64(60)
@@ -52,7 +52,7 @@ end
         conn = MQTTClient.MQTTConnection(MQTTClient.IOConnection(localhost, 1883))
         @test conn.protocol isa MQTTClient.TCP
         @test conn.protocol.ip == localhost
-        @test conn.keep_alive == 32
+        @test conn.keep_alive == 16
         @test length(conn.client_id) == 8
         @test conn.user == MQTTClient.User("", "")
         @test conn.will == MQTTClient.Message(false, 0x00, false, "", UInt8[])
@@ -63,7 +63,7 @@ end
         conn = MQTTClient.MQTTConnection(MQTTClient.IOConnection("localhost", 1883))
         @test conn.protocol isa MQTTClient.TCP
         @test conn.protocol.ip == getaddrinfo("localhost")
-        @test conn.keep_alive == 32
+        @test conn.keep_alive == 16
         @test length(conn.client_id) == 8
         @test conn.user == MQTTClient.User("", "")
         @test conn.will == MQTTClient.Message(false, 0x00, false, "", UInt8[])
@@ -75,7 +75,7 @@ end
         conn = MQTTClient.MQTTConnection(MQTTClient.IOConnection(path))
         @test conn.protocol isa MQTTClient.UDS
         @test conn.protocol.path == path
-        @test conn.keep_alive == 32
+        @test conn.keep_alive == 16
         @test length(conn.client_id) == 8
         @test conn.user == MQTTClient.User("", "")
         @test conn.will == MQTTClient.Message(false, 0x00, false, "", UInt8[])

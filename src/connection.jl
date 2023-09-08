@@ -128,7 +128,7 @@ struct MQTTConnection{T <: AbstractIOConnection}
     clean_session::Bool
 
     MQTTConnection(protocol::T;
-            keep_alive::Int64=32,
+            keep_alive::Int64=16,
             client_id::String=randstring(8),
             user::User=User("", ""),
             will::Message=Message(false, 0x00, false, "", UInt8[]),

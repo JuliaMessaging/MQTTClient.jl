@@ -33,7 +33,7 @@ mutable struct Client{T}
     last_id::UInt16
     in_flight::Dict{UInt16, Future}
 
-    write_packets::Channel{Packet}
+    write_packets::RemoteChannel{Channel{Packet}}
     socket::Union{T, Nothing}
     socket_lock::ReentrantLock
 
@@ -56,7 +56,7 @@ mutable struct Client{T}
             ReentrantLock(),
             0x0000,
             Dict{UInt16, Future}(),
-            Channel{Packet}(typemax(Int64)),
+            RemoteChannel(() -> Channel{Packet}(typemax(Int64))),
             nothing,
             ReentrantLock(),
             ping_timeout,
@@ -99,13 +99,15 @@ function write_loop(client)
             @atomic client.last_sent = time()
         end
     catch e
+        @info e
         # channel closed
         if isa(e, InvalidStateException)
             close(client.socket)
         else
-            rethrow()
+            rethrow(e)
         end
     end
+    nothing
 end
 
 """
@@ -141,9 +143,10 @@ function read_loop(client)
     catch e
         # socket closed
         if !isa(e, EOFError)
-            rethrow()
+            rethrow(e)
         end
     end
+    nothing
 end
 
 """
@@ -200,6 +203,7 @@ function keep_alive_loop(client::Client)
 
         wait(timer)
     end
+    nothing
 end
 
 function packet_id(client::Client)
@@ -218,6 +222,13 @@ end
 # write packet to mqtt broker
 function write_packet(client::Client, cmd::UInt8, data...)
     put!(client.write_packets, Packet(cmd, data))
+end
+
+function fetch(c::Client)
+    kat = isnothing(c.keep_alive_task) || istaskfailed(c.keep_alive_task) ? nothing : fetch(c.keep_alive_task)
+    rt = isnothing(c.read_task) || istaskfailed(c.read_task) ? nothing : wait(c.read_task)
+    wt = isnothing(c.write_task) || istaskfailed(c.write_task) ? nothing : wait(c.write_task)
+    (kat,rt,wt)
 end
 
 lock(c::Client) = lock.([c.cond_state, c.data_lock, c.socket_lock])

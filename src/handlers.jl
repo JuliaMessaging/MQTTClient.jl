@@ -64,7 +64,7 @@ function handle_publish(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     end
 
     payload = take!(s)
-    Threads.@spawn client.on_msg[topic](topic,payload)
+    @async client.on_msg[topic](topic,payload)
 end
 
 function handle_ack(client::Client, s::IO, cmd::UInt8, flags::UInt8)

@@ -117,69 +117,74 @@ If the user name and password are provided in the `connection` object, they are 
 
 The function returns a `Future` object that can be used to track the progress of the connection.
 """
-function connect_async(client::Client, connection::MQTTConnection)::Future
-    client.write_packets = Channel{Packet}(typemax(Int64))
+function connect_async(client::Client{P}, connection::MQTTConnection)::Future where P
     try
-        client.keep_alive = convert(UInt16, connection.keep_alive)
-    catch
-        error("Could not convert keep_alive to UInt16")
-    end
-
-    client.socket = connect(connection.protocol)
-
-    client.write_task = Threads.@spawn write_loop(client)
-    client.read_task = Threads.@spawn read_loop(client)
-
-    if client.keep_alive > 0x0000
-        client.keep_alive_task = Threads.@spawn keep_alive_loop(client)
-    end
-
-    #TODO reset client on clean_session = true
-
-    protocol_name = "MQTT"
-    protocol_level = 0x04 # v3.1.1
-    connect_flags = 0x02 # clean session
-
-    local optional_user = ()
-    local optional_will = ()
-
-    if length(connection.user.name) > 0 && length(connection.user.password) > 0
-        connect_flags |= 0xC0
-        optional_user = (connection.user.name, connection.user.password)
-    elseif length(connection.user.name) > 0
-        connect_flags |= 0x80
-        optional_user = (connection.user.name)
-    end
-
-    if length(connection.will.topic) > 0
-        optional_will = (connection.will.topic, convert(UInt16, length(connection.will.payload)), connection.will.payload)
-        connect_flags |= 0x04 | ((connection.will.qos & 0x03) << 3) | ((connection.will.retain & 0x01) << 5)
-    end
-
-    future = Future()
-    lock(client.data_lock)
-    client.in_flight[0x0000] = future
-    unlock(client.data_lock)
-
-    write_packet(client, CONNECT,
-                 protocol_name,
-                 protocol_level,
-                 connect_flags,
-                 client.keep_alive,
-                 connection.client_id,
-                 optional_user...,
-                 optional_will...)
-
-    return remotecall(myid()) do
-        res = fetch(future)
-
-        lock(client.cond_state)
+        # client.write_packets = Channel{Packet}(typemax(Int64))
         try
-            @atomic :release client.state = :connected
-        finally
-            unlock(client.cond_state)
+            client.keep_alive = convert(UInt16, connection.keep_alive)
+        catch
+            error("Could not convert keep_alive to UInt16")
         end
-        return res
+
+        client.socket = connect(connection.protocol)
+
+        client.write_task = @async write_loop(client)
+        client.read_task = @async read_loop(client)
+
+        if client.keep_alive > 0x0000
+            client.keep_alive_task = @async keep_alive_loop(client)
+        end
+
+        #TODO reset client on clean_session = true
+
+        protocol_name = "MQTT"
+        protocol_level = 0x04 # v3.1.1
+        connect_flags = 0x02 # clean session
+
+        local optional_user = ()
+        local optional_will = ()
+
+        if length(connection.user.name) > 0 && length(connection.user.password) > 0
+            connect_flags |= 0xC0
+            optional_user = (connection.user.name, connection.user.password)
+        elseif length(connection.user.name) > 0
+            connect_flags |= 0x80
+            optional_user = (connection.user.name)
+        end
+
+        if length(connection.will.topic) > 0
+            optional_will = (connection.will.topic, convert(UInt16, length(connection.will.payload)), connection.will.payload)
+            connect_flags |= 0x04 | ((connection.will.qos & 0x03) << 3) | ((connection.will.retain & 0x01) << 5)
+        end
+
+        future = Future()
+        lock(client.data_lock)
+        client.in_flight[0x0000] = future
+        unlock(client.data_lock)
+
+        write_packet(client, CONNECT,
+                     protocol_name,
+                     protocol_level,
+                     connect_flags,
+                     client.keep_alive,
+                     connection.client_id,
+                     optional_user...,
+                     optional_will...)
+
+        return remotecall(myid()) do
+            res = fetch(future)
+
+            lock(client.cond_state)
+            try
+                @atomic :release client.state = :connected
+            finally
+                unlock(client.cond_state)
+            end
+            return res
+        end
+    catch e
+        @error "[client] $e"
+        rethrow(e)
     end
 end
 
@@ -191,17 +196,17 @@ Establishes a synchronous connection to an MQTT broker using the specified `clie
 
 This function is a wrapper around the `connect_async` function, which establishes an asynchronous connection. The `connect` function blocks until the connection is established by calling the `resolve` function on the `Future` object returned by `connect_async`.
 """
-connect(client::Client, connection::MQTTConnection) = resolve(connect_async(client, connection))
+connect(client::Client{T}, connection::MQTTConnection) where T = resolve(connect_async(client, connection))
 
 """
     disconnect(client::Client)
 
 Disconnects the client from the broker and stops the tasks.
 """
-function disconnect(client::Client)::Nothing
+function disconnect(client::Client{T})::Nothing where T
     write_packet(client, DISCONNECT)
     mqtt_close(client)
-    fetch.([client.keep_alive_task, client.read_task, client.write_task])
+    fetch(client)
     lock(client.socket_lock)
     try
         close(client.write_packets)
@@ -215,7 +220,7 @@ function disconnect(client::Client)::Nothing
     nothing
 end
 
-function mqtt_close(client)::Nothing
+function mqtt_close(client::Client{T})::Nothing where T
     lock(client.cond_state)
     try
         notify(client.cond_state, nothing, true, false)
@@ -225,6 +230,7 @@ function mqtt_close(client)::Nothing
     end
     nothing
 end
+
 
 """
     reconnect_async(client::Client, connection::MQTTConnection)
@@ -238,7 +244,7 @@ function reconnect_async(client::Client{T}, connection::MQTTConnection) where T
         client.keep_alive = 0x0020
         client.last_id = 0x0000
         client.in_flight = Dict{UInt16, Future}()
-        client.write_packets = Channel{Packet}(typemax(Int64))
+        client.write_packets = RemoteChannel(() -> Channel{Packet}(typemax(Int64)))
         client.socket = nothing
         @atomic client.ping_outstanding = 0
         @atomic client.last_sent = 0.0
@@ -346,11 +352,13 @@ function publish_async(client::Client, message::Message)
     if message.qos == 0x00
         put!(future, 0)
     elseif message.qos == 0x01 || message.qos == 0x02
-        future = Future()
         id = packet_id(client)
         lock(client.data_lock)
-        client.in_flight[id] = future
-        unlock(client.data_lock)
+        try
+            client.in_flight[id] = future
+        finally
+            unlock(client.data_lock)
+        end
         optional = (id)
     else
         throw(MQTTException("invalid qos"))

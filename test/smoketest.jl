@@ -1,8 +1,8 @@
 function smoke_test(client, conn)
-    show(conn)
-    println()
-    show(client)
-    println()
+    println("+"^60)
+    println(conn)
+    println(client)
+    println("+"^60)
 
     condition = Condition()
     topic = "foo"
@@ -19,36 +19,17 @@ function smoke_test(client, conn)
             notify(condition)
         end
     end
-
-    Distributed.remotecall(1) do
-        while true
-            wait(client.socket.cond)
-            println("+"^60)
-            println("condition was notified!")
-            println(client.state)
-            println("."^60)
-            println(client.socket)
-            println("."^60)
-            println(client)
-            println("+"^60)
-        end
-    end
-
     @test isready(client)
 
     println("Testing reconnect")
     connect(client, conn)
-    @test isconnected(client)
-    println(client.state)
     sleep(0.05)
     disconnect(client)
     @test isdone(client)
-    println(client.state)
     sleep(0.05)
     println("reconnecting!")
     reconnect(client, conn)
     @test isconnected(client)
-    println(client.state)
     sleep(0.05)
 
     @time "subscribe_async" subscribe_async(client, topic, on_msg, qos=QOS_2)
@@ -101,10 +82,10 @@ function smoke_test(client, conn)
 end
 
 function stress_test(client, conn)
-    show(conn)
-    println()
-    show(client)
-    println()
+    println("+"^32)
+    println(conn)
+    println(client)
+    println("+"^32)
 
     condition = Condition()
     topic1 = "foo"
