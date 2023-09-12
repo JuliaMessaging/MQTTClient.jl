@@ -82,7 +82,7 @@ This function writes data to the socket.
 Nothing.
 
 """
-function write_loop(client)
+function write_loop(client::Client{T})::Nothing where T
     try
         while !isdone(client)
             packet = take!(client.write_packets)
@@ -92,11 +92,14 @@ function write_loop(client)
             end
             data = take!(buffer)
             lock(client.socket_lock)
-            write(client.socket, packet.cmd)
-            write_len(client.socket, length(data))
-            write(client.socket, data)
-            unlock(client.socket_lock)
-            @atomic client.last_sent = time()
+            try
+                write(client.socket, packet.cmd)
+                write_len(client.socket, length(data))
+                write(client.socket, data)
+            finally
+                unlock(client.socket_lock)
+            end
+            @atomic :release client.last_sent = time()
         end
     catch e
         @info e
@@ -123,7 +126,7 @@ Reads data from a client socket and processes it.
 read_loop(client)
 ```
 """
-function read_loop(client)
+function read_loop(client::Client{T})::Nothing where T
     try
         while !isdone(client)
             cmd_flags = read(client.socket, UInt8)
@@ -134,7 +137,7 @@ function read_loop(client)
             flags = cmd_flags & 0x0F
 
             if haskey(HANDLERS, cmd)
-                @atomic client.last_received = time()
+                @atomic :release client.last_received = time()
                 HANDLERS[cmd](client, buffer, cmd, flags)
             else
                 # TODO unexpected cmd protocol error
@@ -154,7 +157,7 @@ end
 
 This function runs a loop that sends a PINGREQ message to the MQTT broker to keep the connection alive. The loop checks the connection at regular intervals determined by the `client.keep_alive` value. If no message has been sent or received within the keep-alive interval, a PINGREQ message is sent. If no PINGRESP message is received within the `client.ping_timeout` interval, the client is disconnected.
 """
-function keep_alive_loop(client::Client)
+function keep_alive_loop(client::Client{T})::Nothing where T
     ping_sent = time()
 
     if client.keep_alive > 10
@@ -167,13 +170,16 @@ function keep_alive_loop(client::Client)
     while !isdone(client)
         if time() - lastsent(client) >= client.keep_alive || time() - lastreceived(client) >= client.keep_alive
             if !ispingoutstanding(client)
-                @atomic client.ping_outstanding = 0x1
+                @atomic :release client.ping_outstanding = 0x1
                 try
                     lock(client.socket_lock)
-                    write(client.socket, PINGREQ)
-                    write(client.socket, 0x00)
-                    unlock(client.socket_lock)
-                    @atomic client.last_sent = time()
+                    try
+                        write(client.socket, PINGREQ)
+                        write(client.socket, 0x00)
+                    finally
+                        unlock(client.socket_lock)
+                    end
+                    @atomic :release client.last_sent = time()
                 catch e
                     if isa(e, InvalidStateException)
                         break
@@ -188,8 +194,7 @@ function keep_alive_loop(client::Client)
 
         if ispingoutstanding(client) && time() - ping_sent >= client.ping_timeout
             try # No pingresp received
-                disconnect(client)
-                break
+                return disconnect(client)
             catch e
                 # channel closed
                 if isa(e, InvalidStateException)

@@ -158,9 +158,13 @@ function connect_async(client::Client{P}, connection::MQTTConnection)::Future wh
         end
 
         future = Future()
+
         lock(client.data_lock)
-        client.in_flight[0x0000] = future
-        unlock(client.data_lock)
+        try
+            client.in_flight[0x0000] = future
+        finally
+            unlock(client.data_lock)
+        end
 
         write_packet(client, CONNECT,
                      protocol_name,
@@ -246,9 +250,9 @@ function reconnect_async(client::Client{T}, connection::MQTTConnection) where T
         client.in_flight = Dict{UInt16, Future}()
         client.write_packets = RemoteChannel(() -> Channel{Packet}(typemax(Int64)))
         client.socket = nothing
-        @atomic client.ping_outstanding = 0
-        @atomic client.last_sent = 0.0
-        @atomic client.last_received = 0.0
+        @atomic :release client.ping_outstanding = 0
+        @atomic :release client.last_sent = 0.0
+        @atomic :release client.last_received = 0.0
         client.write_task = nothing
         client.read_task = nothing
         client.keep_alive_task = nothing
