@@ -1,11 +1,4 @@
 """
-    AbstractIOConnection
-
-    Base Connection Protocol type
-"""
-abstract type AbstractIOConnection end
-
-"""
     TCP <: AbstractIOConnection
 
 A struct representing a TCP connection.
@@ -148,3 +141,5 @@ struct MQTTConnection{T <: AbstractIOConnection}
             will::Message,
             clean_session::Bool) where T <: AbstractIOConnection = new{T}(protocol, keep_alive, client_id, user, will, clean_session)
 end
+
+Base.show(io::IO, connection::MQTTConnection) = print(io, "MQTTConnection(Protocol: $(connection.protocol), Client ID: $(connection.client_id)", (connection.user == User("","") ? "" : ", User Name: $(connection.user.name)"), ")")

@@ -85,15 +85,23 @@ Establishes an MQTT connection using the given IO connection.
 # Returns
 A tuple containing a `Client` object and an `MQTTConnection` object.
 """
-function MakeConnection(io::T,
+function MakeConnection(io::TCP,
         ping_timeout=UInt64(60),
         keep_alive::Int64=32,
         client_id::String=randstring(8),
         user::User=User("", ""),
         will::Message=Message(false, 0x00, false, "", UInt8[]),
-        clean_session::Bool=true)::Tuple where T <: AbstractIOConnection
+        clean_session::Bool=true)::Tuple{Client, MQTTConnection}
     return (Client(ping_timeout), MQTTConnection(io, keep_alive, client_id, user, will, clean_session))
-
+end
+function MakeConnection(io::UDS,
+        ping_timeout=UInt64(60),
+        keep_alive::Int64=32,
+        client_id::String=randstring(8),
+        user::User=User("", ""),
+        will::Message=Message(false, 0x00, false, "", UInt8[]),
+        clean_session::Bool=true)::Tuple{Client, MQTTConnection}
+    return (Client(ping_timeout), MQTTConnection(io, keep_alive, client_id, user, will, clean_session))
 end
 
 
