@@ -1,7 +1,7 @@
 print("\n"^3)
 
 ## TCP Protocol Smoke Test and Stress Test
-tcp_test_client, tcp_test_conn = MakeConnection(localhost, 8883, user = MQTTClient.User("test","test"))
+tcp_test_client, tcp_test_conn = MakeConnection(localhost, 8883, user = MQTTClient.User("test","test"), keep_alive = 1)
 try
     s = connect(tcp_test_conn.protocol)
     close(s)
