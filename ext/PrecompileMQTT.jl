@@ -1,3 +1,4 @@
+# COV_EXCL_START
 module PrecompileMQTT # Should be same name as the file (just like a normal package)
 
 using MQTTClient
@@ -71,3 +72,4 @@ precompile(Tuple{typeof(Base.indexed_iterate), Tuple{Nothing, Int64}, Int64, Int
 end
 
 end # module
+# COV_EXCL_STOP
