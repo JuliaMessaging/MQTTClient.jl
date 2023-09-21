@@ -202,3 +202,5 @@ end
 function write_packet(client::Client, cmd::UInt8, data...)
     put!(client.write_packets, Packet(cmd, data))
 end
+
+Base.show(io::IO, client::Client) = print(io, "MQTTClient(State: $(client.state), Topic Subscriptions: $(collect(keys(client.on_msg))))")

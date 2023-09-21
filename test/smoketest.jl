@@ -1,4 +1,6 @@
 function smoke_test(client, conn)
+    println(client)
+    println(conn)
     condition = Base.Event()
     topic = "foo"
     payload = Random.randstring(20)
@@ -23,9 +25,6 @@ function smoke_test(client, conn)
             notify(condition)
         end
     end
-
-    client = Client()
-    println(client)
 
     println("Testing reconnect")
     connect(client, conn)
@@ -95,6 +94,8 @@ function smoke_test(client, conn)
 end
 
 function stress_test(client, conn)
+    println(client)
+    println(conn)
     condition = Base.Event()
     topic1 = "foo"
     topic2 = "bar"
