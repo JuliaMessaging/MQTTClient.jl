@@ -62,7 +62,19 @@ function handle_publish(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     end
 
     payload = take!(s)
-    @async client.on_msg[topic](topic,payload)
+    if haskey(client.on_msg, topic)
+        @async client.on_msg[topic](topic,payload)
+    else
+        try
+            options = Vector{String}(collect(keys(client.on_msg)))
+            matches = findall(t -> topic_eq(t, topic), options)
+            for topic_match in options[matches]
+                @async client.on_msg[topic_match](topic,payload)
+            end
+        catch e
+            @error e
+        end
+    end
 end
 
 function handle_ack(client::Client, s::IO, cmd::UInt8, flags::UInt8)

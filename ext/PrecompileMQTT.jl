@@ -1,5 +1,12 @@
+# COV_EXCL_START
+module PrecompileMQTT # Should be same name as the file (just like a normal package)
+
+using MQTTClient
 using PrecompileTools
 using Random
+
+precompile(Tuple{typeof(Base.indexed_iterate), Tuple{Nothing, Int64}, Int64})
+precompile(Tuple{typeof(Base.indexed_iterate), Tuple{Nothing, Int64}, Int64, Int64})
 
 # Precompiling the package like this provides a slower initial load of the package but faster code execution.
 # based on tests this precompile step reduces compilation at runtime by ~25% and decreases first execution time by ~10%.
@@ -17,9 +24,7 @@ using Random
        payload = Random.randstring(20)
 
        function on_msg(t, p)
-           msg = p |> String
-           @assert MQTTClient.topic_eq("$topic#", t)
-           @assert msg == payload
+           nothing
        end
 
        connect(client, conn)
@@ -65,3 +70,6 @@ using Random
         disconnect(tcpclient)
     end
 end
+
+end # module
+# COV_EXCL_STOP

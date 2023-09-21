@@ -1,10 +1,10 @@
 module MQTTClient
 
-using Distributed: Future, RemoteChannel
+using Distributed: Future, myid, remotecall, RemoteChannel
 using Sockets: TCPSocket, IPAddr, PipeServer, getaddrinfo
 import Sockets: connect
 using Random: randstring
-import Base: ReentrantLock, lock, unlock, convert
+import Base: ReentrantLock, lock, unlock, convert, PipeEndpoint, isready, Ref, RefValue, fetch
 using Base.Threads
 
 
@@ -15,7 +15,7 @@ include("connection.jl")
 include("handlers.jl")
 include("interface.jl")
 
-VERSION > v"1.8" ? include("precompile.jl") : @debug "PrecompileTools is most useful in versions 1.9+. $VERSION is too old, explicit precompile is not being used."
+# VERSION > v"1.8" ? include("precompile.jl") : println("PrecompileTools is most useful in versions 1.9+. $VERSION is too old, explicit precompile is not being used.")
 
 export
     MakeConnection,
