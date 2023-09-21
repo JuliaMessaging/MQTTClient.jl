@@ -95,6 +95,21 @@ end
         @test c isa MQTTClient.Client
         @test conn isa MQTTClient.MQTTConnection
     end
+    
+    @testset "Test Client show function" begin
+        io = IOBuffer()
+        client, conn = MQTTClient.MakeConnection("localhost", 1883)
+        show(io, client)
+        str = take!(io) |> String
+        @test str == "MQTTClient(Topic Subscriptions: String[])"
+    end
+    @testset "Test Connection show function" begin
+        io = IOBuffer()
+        client, conn = MQTTClient.MakeConnection("localhost", 1883, client_id="foo")
+        show(io, conn)
+        str = take!(io) |> String
+        @test str == "MQTTConnection(Protocol: MQTTClient.TCP(ip\"::1\", 1883), Client ID: foo)"
+    end
 
     @testset "MQTT subscribe async" begin
         c = MQTTClient.Client()
