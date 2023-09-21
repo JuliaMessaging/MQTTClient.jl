@@ -1,5 +1,5 @@
 function smoke_test(client, conn)
-    condition = Condition()
+    condition = Base.Event()
     topic = "foo"
     payload = Random.randstring(20)
     client_test_res = Channel{Bool}(100)
@@ -9,6 +9,15 @@ function smoke_test(client, conn)
             msg = p |> String
             println("Received message topic: [", t, "] payload: [", msg, "]")
             put!(client_test_res, MQTTClient.topic_eq("$topic#", t))
+            put!(client_test_res, msg == payload)
+            sleep(0.01)
+            notify(condition)
+        end
+    end
+    function on_wildcard_msg(t, p)
+        @time "on_msg[$t]" begin
+            msg = p |> String
+            println("Received message topic: [", t, "] payload: [", msg, "]")
             put!(client_test_res, msg == payload)
             sleep(0.01)
             notify(condition)
@@ -30,6 +39,7 @@ function smoke_test(client, conn)
     @time "subscribe[QOS0]" subscribe(client, "$topic/qos0", on_msg, qos=QOS_0)
     @time "subscribe[QOS1]" subscribe(client, "$topic/qos1", on_msg, qos=QOS_1)
     @time "subscribe[QOS2]" subscribe(client, "$topic/qos2", on_msg, qos=QOS_2)
+    @time "subscribe #" subscribe(client, "wildcard/#", on_wildcard_msg, qos=QOS_2)
 
     println("Testing publish qos 0")
     publish(client, "$topic/qos0", payload, qos=QOS_0)
@@ -40,6 +50,7 @@ function smoke_test(client, conn)
     wait(condition)
 
     println("Testing publish qos 1")
+    reset(condition)
     publish(client, "$topic/qos1", payload, qos=QOS_1)
     sleep(0.02)
     publish(client, "$topic/qos1", payload, qos=QOS_1)
@@ -48,6 +59,7 @@ function smoke_test(client, conn)
     wait(condition)
 
     println("Testing publish qos 2")
+    reset(condition)
     publish(client, "$topic/qos2", payload, qos=QOS_2)
     sleep(0.02)
     publish(client, "$topic/qos2", payload, qos=QOS_2)
@@ -55,6 +67,13 @@ function smoke_test(client, conn)
     publish_async(client, topic, payload)
     wait(condition)
 
+    println("Testing wildcard topic")
+    reset(condition)
+    publish_async(client, "wildcard/foo", payload, qos=QOS_2)
+    sleep(0.02)
+    publish_async(client, "wildcard/bar", payload, qos=QOS_2)
+    sleep(0.02)
+    wait(condition)
     # publish(client, topic, payload)
     # sleep(0.1)
     # publish(client, topic, payload)
@@ -76,7 +95,7 @@ function smoke_test(client, conn)
 end
 
 function stress_test(client, conn)
-    condition = Condition()
+    condition = Base.Event()
     topic1 = "foo"
     topic2 = "bar"
     topic3 = Random.randstring(4)
