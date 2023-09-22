@@ -140,6 +140,9 @@ function connect_async(client::Client, connection::MQTTConnection)
             client.ping_outstanding = Atomic{UInt8}(0)
             client.last_sent = Atomic{Float64}()
             client.last_received = Atomic{Float64}()
+            client.write_task = nothing
+            client.read_task = nothing
+            client.keep_alive_task = nothing
     end
 
     try
@@ -150,11 +153,11 @@ function connect_async(client::Client, connection::MQTTConnection)
 
     client.socket = connect(connection.protocol)
 
-    @async write_loop(client)
-    @async read_loop(client)
+    client.write_task = @async write_loop(client)
+    client.read_task = @async read_loop(client)
 
     if client.keep_alive > 0x0000
-        @async keep_alive_loop(client)
+        client.keep_alive_task = @async keep_alive_loop(client)
     end
 
     #TODO reset client on clean_session = true
@@ -191,11 +194,6 @@ function connect_async(client::Client, connection::MQTTConnection)
                  optional_user...,
                  optional_will...)
 
-    @async begin
-        wait(client.in_flight[0x0000])
-        @atomicreplace client.state 0x00 => 0x01
-    end
-
     return future
 end
 
@@ -207,7 +205,7 @@ Establishes a synchronous connection to an MQTT broker using the specified `clie
 
 This function is a wrapper around the `connect_async` function, which establishes an asynchronous connection. The `connect` function blocks until the connection is established by calling the `resolve` function on the `Future` object returned by `connect_async`.
 """
-connect(client::Client, connection::MQTTConnection) = resolve(connect_async(client, connection))
+connect(client::Client, connection::MQTTConnection) = fetch(connect_async(client, connection))
 
 
 """
@@ -216,16 +214,32 @@ connect(client::Client, connection::MQTTConnection) = resolve(connect_async(clie
 Disconnects the client from the broker and stops the tasks.
 """
 function disconnect(client::Client)
+    println(CLIENT_STATE[client.state])
+    println(client.socket)
     if !isconnected(client)
         throw(MQTTException("Not Connected. Cannot Disconnect."))
     end
-    write_packet(client, DISCONNECT)
-    close(client.write_packets)
 
     @atomicreplace client.state 0x01 => 0x02
 
-    # FIXME: figure out what this does.
-    #wait(client.socket.closenotify)
+    packet = Packet(DISCONNECT,())
+    buffer = PipeBuffer()
+    for i in packet.data
+        mqtt_write(buffer, i)
+    end
+    data = take!(buffer)
+    lock(client.socket_lock)
+    write(client.socket, packet.cmd)
+    write_len(client.socket, length(data))
+    write(client.socket, data)
+    unlock(client.socket_lock)
+    atomic_xchg!(client.last_sent, time())
+
+    # write_packet(client, DISCONNECT)
+    close(client.write_packets)
+    close(client.socket)
+
+    fetch(client)
 end
 
 """

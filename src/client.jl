@@ -42,6 +42,10 @@ mutable struct Client
     last_sent::Atomic{Float64}
     last_received::Atomic{Float64}
 
+    write_task::Union{Nothing,Task}
+    read_task::Union{Nothing,Task}
+    keep_alive_task::Union{Nothing,Task}
+
     Client(ping_timeout::UInt64=UInt64(60)) = new(
             0x00,
             Dict{String,Function}(),
@@ -54,7 +58,11 @@ mutable struct Client
             ping_timeout,
             Atomic{UInt8}(0),
             Atomic{Float64}(),
-            Atomic{Float64}())
+            Atomic{Float64}(),
+            nothing,
+            nothing,
+            nothing
+        )
 end
 
 
@@ -71,9 +79,9 @@ This function writes data to the socket.
 Nothing.
 
 """
-function write_loop(client)
+function write_loop(client::Client)::UInt8
     try
-        while !islosed(client)
+        while !isclosed(client) && isopen(client.socket) && isopen(client.write_packets)
             packet = take!(client.write_packets)
             buffer = PipeBuffer()
             for i in packet.data
@@ -87,12 +95,17 @@ function write_loop(client)
             unlock(client.socket_lock)
             atomic_xchg!(client.last_sent, time())
         end
+        return 0x00
     catch e
         # channel closed
         if isa(e, InvalidStateException)
             close(client.socket)
+            return 0x01
         else
-            rethrow()
+            @error "WRITE LOOP ERROR"
+            @error stacktrace(catch_backtrace())
+            @atomicswap client.state = 0x03
+            rethrow(e)
         end
     end
 end
@@ -110,9 +123,9 @@ Reads data from a client socket and processes it.
 read_loop(client)
 ```
 """
-function read_loop(client)
+function read_loop(client::Client)::UInt8
     try
-        while !islosed(client)
+        while !isclosed(client) && isopen(client.socket) && isopen(client.write_packets)
             cmd_flags = read(client.socket, UInt8)
             len = read_len(client.socket)
             data = read(client.socket, len)
@@ -127,11 +140,16 @@ function read_loop(client)
                 # TODO unexpected cmd protocol error
             end
         end
+        return 0x00
     catch e
         # socket closed
         if !isa(e, EOFError)
-            rethrow()
+            @atomicswap client.state = 0x03
+            @error "READ LOOP ERROR"
+            @error stacktrace(catch_backtrace())
+            rethrow(e)
         end
+        return 0x01
     end
 end
 
@@ -140,7 +158,7 @@ end
 
 This function runs a loop that sends a PINGREQ message to the MQTT broker to keep the connection alive. The loop checks the connection at regular intervals determined by the `client.keep_alive` value. If no message has been sent or received within the keep-alive interval, a PINGREQ message is sent. If no PINGRESP message is received within the `client.ping_timeout` interval, the client is disconnected.
 """
-function keep_alive_loop(client::Client)
+function keep_alive_loop(client::Client)::UInt8
     ping_sent = time()
 
     if client.keep_alive > 10
@@ -148,9 +166,9 @@ function keep_alive_loop(client::Client)
     else
         check_interval = client.keep_alive / 2
     end
-    timer = Timer(0, check_interval)
+    timer = Timer(0, interval=check_interval)
 
-    while !islosed(client)
+    while !isclosed(client) && isopen(client.socket)
         if time() - client.last_sent[] >= client.keep_alive || time() - client.last_received[] >= client.keep_alive
             if client.ping_outstanding[] == 0x0
                 atomic_xchg!(client.ping_outstanding, 0x1)
@@ -161,6 +179,7 @@ function keep_alive_loop(client::Client)
                     unlock(client.socket_lock)
                     atomic_xchg!(client.last_sent, time())
                 catch e
+                    @atomicswap client.state = 0x03
                     if isa(e, InvalidStateException)
                         break
                         # TODO is this the socket closed exception? Handle accordingly
@@ -178,6 +197,7 @@ function keep_alive_loop(client::Client)
                 break
             catch e
                 # channel closed
+                @atomicswap client.state = 0x03
                 if isa(e, InvalidStateException)
                     break
                 else
@@ -189,6 +209,7 @@ function keep_alive_loop(client::Client)
 
         wait(timer)
     end
+    return 0x01
 end
 
 # TODO needs mutex
@@ -207,6 +228,20 @@ end
 
 isready(client::Client)::Bool = client.state == 0x00
 isconnected(client::Client)::Bool = client.state == 0x01
-islosed(client::Client)::Bool = client.state == 0x02
+isclosed(client::Client)::Bool = client.state >= 0x02
+iserror(client::Client)::Bool = client.state == 0x03
 
 show(io::IO, client::Client) = print(io, "MQTTClient(Topic Subscriptions: $(collect(keys(client.on_msg))))")
+
+fetch(client::Client)::Tuple{UInt8,UInt8} = begin
+    try
+        wres = isnothing(client.write_task) ? 0x00 : fetch(client.write_task)
+        rres = isnothing(client.read_task) ? 0x00 : fetch(client.read_task)
+        # kares = isnothing(client.keep_alive_task) ? 0x00 : fetch(client.keep_alive_task)
+
+        return (wres, rres)
+    catch e
+        @error e
+        return (0x00, 0x00)
+    end
+end

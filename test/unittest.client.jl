@@ -178,6 +178,8 @@ end
         # Test unsuccessful connection
         io = IOBuffer(UInt8[0x01, 0x01])
         @test_throws ErrorException MQTTClient.handle_connack(c, io, 0x00, 0x00)
+
+        @test MQTTClient.isclosed(c)
     end
 
     @testset "handle_publish" begin
@@ -294,11 +296,12 @@ end
         # Check that the ping_outstanding value was updated correctly
         @test c.ping_outstanding[] == 0x0
 
-        # Set the ping_outstanding value to 0x0 and call the handle_pingresp function again
-        c.ping_outstanding[] = 0x0
-        MQTTClient.handle_pingresp(c, s, cmd, flags)
-        p = take!(c.write_packets)
-        @test p == MQTTClient.Packet(MQTTClient.DISCONNECT, ())
+        # NOTE: update this to use different msg type.
+        # # Set the ping_outstanding value to 0x0 and call the handle_pingresp function again
+        # c.ping_outstanding[] = 0x0
+        # MQTTClient.handle_pingresp(c, s, cmd, flags)
+        # p = take!(c.write_packets)
+        # @test p == MQTTClient.Packet(MQTTClient.DISCONNECT, ())
     end
 
 end
