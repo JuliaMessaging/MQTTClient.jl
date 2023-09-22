@@ -18,9 +18,6 @@ Otherwise, it returns a `Channel{Packet}` of length `len`.
 # macro mqtt_channel(len::Number=128)
 #     return Threads.nthreads() > 1 ? :(RemoteChannel(()->Channel{Packet}($len))) : :(Channel{Packet}($len))
 # end
-macro mqtt_channel(len::Number=128)
-    return :(Channel{Packet}($len))
-end
 
 """
     topic_eq(baseT::String, compareT::String)

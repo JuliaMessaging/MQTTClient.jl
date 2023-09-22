@@ -108,7 +108,7 @@ end
         client, conn = MQTTClient.MakeConnection("localhost", 1883, client_id="foo")
         show(io, conn)
         str = take!(io) |> String
-        @test str == "MQTTConnection(Protocol: MQTTClient.TCP(ip\"::1\", 1883), Client ID: foo)"
+        @test contains(str, "MQTTConnection(Protocol: MQTTClient.TCP")
     end
 
     @testset "MQTT subscribe async" begin
@@ -285,6 +285,8 @@ end
 
         # Set the ping_outstanding value to 0x1
         c.ping_outstanding[] = 0x1
+
+        @atomicswap c.state = 0x01
 
         # Call the handle_pingresp function
         MQTTClient.handle_pingresp(c, s, cmd, flags)

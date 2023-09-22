@@ -3,7 +3,7 @@ using Test
 using MQTTClient
 using Distributed, Random
 
-import MQTTClient: topic_wildcard_len_check, filter_wildcard_len_check, MQTTException
+import MQTTClient: topic_wildcard_len_check, filter_wildcard_len_check, MQTTException, Packet
 import Sockets: TCPSocket, PipeServer, connect, localhost, getaddrinfo, IOError, DNSError
 import Base.PipeEndpoint
 

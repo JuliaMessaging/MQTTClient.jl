@@ -21,7 +21,7 @@ end;
 end
 
 @testset "mqtt distributed channel" begin
-    ch = MQTTClient.@mqtt_channel
+    ch = Channel{Packet}(typemax(Int64))
     a = MQTTClient.Packet(MQTTClient.PINGREQ, rand(UInt8, 16))
     put!(ch, a)
     b = take!(ch)

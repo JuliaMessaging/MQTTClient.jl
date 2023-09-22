@@ -22,6 +22,7 @@ An MQTT client is any device (from a microcontroller up to a fully-fledged serve
 `Client(ping_timeout::UInt64=UInt64(60))` constructs a new `Client` object with the specified ping timeout (default: 60 seconds).
 """
 mutable struct Client
+    @atomic state::UInt8
 
     on_msg::Dict{String,Function}
     keep_alive::UInt16
@@ -30,7 +31,7 @@ mutable struct Client
     last_id::UInt16
     in_flight::Dict{UInt16, Future}
 
-    write_packets::AbstractChannel
+    write_packets::Channel{Packet}
     socket
     socket_lock # TODO add type
 
@@ -42,11 +43,12 @@ mutable struct Client
     last_received::Atomic{Float64}
 
     Client(ping_timeout::UInt64=UInt64(60)) = new(
+            0x00,
             Dict{String,Function}(),
             0x0000,
             0x0000,
             Dict{UInt16, Future}(),
-            (@mqtt_channel),
+            Channel{Packet}(typemax(Int64)),
             nothing,
             ReentrantLock(),
             ping_timeout,
@@ -71,7 +73,7 @@ Nothing.
 """
 function write_loop(client)
     try
-        while true
+        while !islosed(client)
             packet = take!(client.write_packets)
             buffer = PipeBuffer()
             for i in packet.data
@@ -110,7 +112,7 @@ read_loop(client)
 """
 function read_loop(client)
     try
-        while true
+        while !islosed(client)
             cmd_flags = read(client.socket, UInt8)
             len = read_len(client.socket)
             data = read(client.socket, len)
@@ -148,7 +150,7 @@ function keep_alive_loop(client::Client)
     end
     timer = Timer(0, check_interval)
 
-    while true
+    while !islosed(client)
         if time() - client.last_sent[] >= client.keep_alive || time() - client.last_received[] >= client.keep_alive
             if client.ping_outstanding[] == 0x0
                 atomic_xchg!(client.ping_outstanding, 0x1)
@@ -203,4 +205,8 @@ function write_packet(client::Client, cmd::UInt8, data...)
     put!(client.write_packets, Packet(cmd, data))
 end
 
-Base.show(io::IO, client::Client) = print(io, "MQTTClient(Topic Subscriptions: $(collect(keys(client.on_msg))))")
+isready(client::Client)::Bool = client.state == 0x00
+isconnected(client::Client)::Bool = client.state == 0x01
+islosed(client::Client)::Bool = client.state == 0x02
+
+show(io::IO, client::Client) = print(io, "MQTTClient(Topic Subscriptions: $(collect(keys(client.on_msg))))")
