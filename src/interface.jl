@@ -214,32 +214,33 @@ connect(client::Client, connection::MQTTConnection) = fetch(connect_async(client
 Disconnects the client from the broker and stops the tasks.
 """
 function disconnect(client::Client)
-    println(CLIENT_STATE[client.state])
-    println(client.socket)
     if !isconnected(client)
         throw(MQTTException("Not Connected. Cannot Disconnect."))
     end
 
+    @info "send disconnect"
+    write_packet(client, DISCONNECT)
+    # @info "wait write close"
+    wait(client.write_task)
+
+    # @info "send stop msg"
     @atomicreplace client.state 0x01 => 0x02
 
-    packet = Packet(DISCONNECT,())
-    buffer = PipeBuffer()
-    for i in packet.data
-        mqtt_write(buffer, i)
-    end
-    data = take!(buffer)
-    lock(client.socket_lock)
-    write(client.socket, packet.cmd)
-    write_len(client.socket, length(data))
-    write(client.socket, data)
-    unlock(client.socket_lock)
-    atomic_xchg!(client.last_sent, time())
+    # @info "eof socket"
+    eof(client.socket)
 
-    # write_packet(client, DISCONNECT)
+    wait(client.read_task)
+    # @info "reading done!"
+
+    # @info "close write channel"
     close(client.write_packets)
+
+    # @info "close socket"
     close(client.socket)
 
-    fetch(client)
+    res = fetch(client)
+    @info "client state: $res"
+    res
 end
 
 """

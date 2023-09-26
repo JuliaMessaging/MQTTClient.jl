@@ -81,7 +81,7 @@ Nothing.
 """
 function write_loop(client::Client)::UInt8
     try
-        while !isclosed(client) && isopen(client.socket) && isopen(client.write_packets)
+        while !isclosed(client)
             packet = take!(client.write_packets)
             buffer = PipeBuffer()
             for i in packet.data
@@ -94,6 +94,10 @@ function write_loop(client::Client)::UInt8
             write(client.socket, data)
             unlock(client.socket_lock)
             atomic_xchg!(client.last_sent, time())
+
+            if packet.cmd === DISCONNECT
+                break
+            end
         end
         return 0x00
     catch e
@@ -125,7 +129,7 @@ read_loop(client)
 """
 function read_loop(client::Client)::UInt8
     try
-        while !isclosed(client) && isopen(client.socket) && isopen(client.write_packets)
+        while !isclosed(client)
             cmd_flags = read(client.socket, UInt8)
             len = read_len(client.socket)
             data = read(client.socket, len)
@@ -168,7 +172,7 @@ function keep_alive_loop(client::Client)::UInt8
     end
     timer = Timer(0, interval=check_interval)
 
-    while !isclosed(client) && isopen(client.socket)
+    while !isclosed(client)
         if time() - client.last_sent[] >= client.keep_alive || time() - client.last_received[] >= client.keep_alive
             if client.ping_outstanding[] == 0x0
                 atomic_xchg!(client.ping_outstanding, 0x1)
@@ -209,7 +213,7 @@ function keep_alive_loop(client::Client)::UInt8
 
         wait(timer)
     end
-    return 0x01
+    return 0x00
 end
 
 # TODO needs mutex
@@ -233,15 +237,15 @@ iserror(client::Client)::Bool = client.state == 0x03
 
 show(io::IO, client::Client) = print(io, "MQTTClient(Topic Subscriptions: $(collect(keys(client.on_msg))))")
 
-fetch(client::Client)::Tuple{UInt8,UInt8} = begin
+fetch(client::Client)::Tuple{UInt8,UInt8, UInt8} = begin
     try
         wres = isnothing(client.write_task) ? 0x00 : fetch(client.write_task)
         rres = isnothing(client.read_task) ? 0x00 : fetch(client.read_task)
-        # kares = isnothing(client.keep_alive_task) ? 0x00 : fetch(client.keep_alive_task)
+        kares = isnothing(client.keep_alive_task) ? 0x00 : fetch(client.keep_alive_task)
 
-        return (wres, rres)
+        return (wres, rres, kares)
     catch e
         @error e
-        return (0x00, 0x00)
+        return (0x00, 0x00, 0x00)
     end
 end
