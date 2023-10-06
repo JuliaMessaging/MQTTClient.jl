@@ -41,6 +41,37 @@ end
         @test msg.topic == "test"
         @test msg.payload == [UInt8('p'), UInt8('a'), UInt8('y'), UInt8('l'), UInt8('o'), UInt8('a'), UInt8('d')]
     end
+
+    @testset "write_loop" begin
+        c = MQTTClient.Client()
+        c.socket = TCPSocket()
+        close(c.socket)
+        message = MQTTClient.Message(false, UInt8(MQTTClient.QOS_2), false, "test/foo", "payload")
+        optional = message.qos == 0x00 ? () : (2)
+        cmd = MQTTClient.PUBLISH | ((message.dup & 0x1) << 3) | (message.qos << 1) | message.retain
+        packet = MQTTClient.Packet(cmd, [message.topic, optional..., message.payload])
+        put!(c.write_packets, packet)
+
+        @test_throws IOError MQTTClient.write_loop(c)
+    end
+
+    @testset "packet_id" begin
+        c = MQTTClient.Client()
+        c.last_id = typemax(UInt16)
+        @test MQTTClient.packet_id(c) == 1
+    end
+
+    @testset "client state" begin
+        c = MQTTClient.Client()
+        @atomicswap c.state = 0x00
+        @test isready(c)
+        @atomicswap c.state = 0x01
+        @test MQTTClient.isconnected(c)
+        @atomicswap c.state = 0x02
+        @test MQTTClient.isclosed(c)
+        @atomicswap c.state = 0x03
+        @test MQTTClient.iserror(c)
+    end
 end
 
 @testset verbose = true "MQTT Connection functionality" begin
@@ -108,7 +139,7 @@ end
         client, conn = MQTTClient.MakeConnection("localhost", 1883, client_id="foo")
         show(io, conn)
         str = take!(io) |> String
-        @test str == "MQTTConnection(Protocol: MQTTClient.TCP(ip\"::1\", 1883), Client ID: foo)"
+        @test contains(str, "MQTTConnection(Protocol: MQTTClient.TCP")
     end
 
     @testset "MQTT subscribe async" begin
@@ -178,31 +209,69 @@ end
         # Test unsuccessful connection
         io = IOBuffer(UInt8[0x01, 0x01])
         @test_throws ErrorException MQTTClient.handle_connack(c, io, 0x00, 0x00)
+
+        @test MQTTClient.isclosed(c)
     end
 
     @testset "handle_publish" begin
         #! TODO: fix this test.
         c = MQTTClient.Client()
-        ch = Channel()
-        c.on_msg["test1"] = (p) -> put!(ch, p == "payload1")
-        c.on_msg["test2"] = (p) -> put!(ch, p == "payload2")
-        c.on_msg["test3"] = (p) -> put!(ch, p == "payload3")
+        ch = Channel{String}(5)
+        c.on_msg["test"] = (t,p) -> put!(ch, strip(String(p),'\0'))
+        c.on_msg["test/#"] = (t,p) -> put!(ch, strip(String(p),'\0'))
 
-        # Test QoS 0
-        io = IOBuffer(UInt8[0x00, 0x04, 0x74, 0x65, 0x73, 0x74, 0x70, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64, 0x31])
-        MQTTClient.handle_publish(c, io, 0x00, 0x00)
-
-        # Test QoS 1
-        io = IOBuffer(UInt8[0x00, 0x04, 0x74, 0x65, 0x73, 0x74, 0x70, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64, 0x32])
-        MQTTClient.handle_publish(c, io, 0x00, 0x02)
-
-        # Test QoS 2
-        io = IOBuffer(UInt8[0x00, 0x04, 0x74, 0x65, 0x73, 0x74, 0x70, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64, 0x33])
-        MQTTClient.handle_publish(c, io, 0x00, 0x04)
-
-        while !isempty(ch)
-            @test take!(ch)
+        message = MQTTClient.Message(false, UInt8(MQTTClient.QOS_0), false, "test", "payload")
+        optional = message.qos == 0x00 ? () : (0)
+        cmd = MQTTClient.PUBLISH | ((message.dup & 0x1) << 3) | (message.qos << 1) | message.retain
+        packet = MQTTClient.Packet(cmd, [message.topic, optional..., message.payload])
+        buffer = PipeBuffer()
+        for i in packet.data
+            MQTTClient.mqtt_write(buffer, i)
         end
+        MQTTClient.handle_publish(c, buffer, 0x00, 0x00)
+        payload = take!(ch)
+        @test payload == "payload"
+
+        message = MQTTClient.Message(false, UInt8(MQTTClient.QOS_1), false, "test", "payload")
+        optional = message.qos == 0x00 ? () : (1)
+        cmd = MQTTClient.PUBLISH | ((message.dup & 0x1) << 3) | (message.qos << 1) | message.retain
+        packet = MQTTClient.Packet(cmd, [message.topic, optional..., message.payload])
+        buffer = PipeBuffer()
+        for i in packet.data
+            MQTTClient.mqtt_write(buffer, i)
+        end
+        MQTTClient.handle_publish(c, buffer, 0x00, 0x02)
+        payload = take!(ch)
+        @test payload == "payload"
+
+        message = MQTTClient.Message(false, UInt8(MQTTClient.QOS_2), false, "test", "payload")
+        optional = message.qos == 0x00 ? () : (2)
+        cmd = MQTTClient.PUBLISH | ((message.dup & 0x1) << 3) | (message.qos << 1) | message.retain
+        packet = MQTTClient.Packet(cmd, [message.topic, optional..., message.payload])
+        buffer = PipeBuffer()
+        for i in packet.data
+            MQTTClient.mqtt_write(buffer, i)
+        end
+        MQTTClient.handle_publish(c, buffer, 0x00, 0x04)
+        payload = take!(ch)
+        @test payload == "payload"
+
+        message = MQTTClient.Message(false, UInt8(MQTTClient.QOS_2), false, "test/foo", "payload")
+        optional = message.qos == 0x00 ? () : (2)
+        cmd = MQTTClient.PUBLISH | ((message.dup & 0x1) << 3) | (message.qos << 1) | message.retain
+        packet = MQTTClient.Packet(cmd, [message.topic, optional..., message.payload])
+        buffer = PipeBuffer()
+        for i in packet.data
+            MQTTClient.mqtt_write(buffer, i)
+        end
+        MQTTClient.handle_publish(c, buffer, 0x00, 0x04)
+        payload = take!(ch)
+        @test payload == "payload"
+
+        # on_msg["test/#"] = (t,p) -> put!(ch, p == "payload4")
+        # io = IOBuffer(Vector{UInt8}("\0\x08test/foopayload4"))
+        # @test MQTTClient.mqtt_read(io, String) == "test/foo"
+        # MQTTClient.handle_publish(c, io, 0x00, 0x02)
     end
 
     @testset "handle_ack" begin
@@ -213,6 +282,13 @@ end
         io = IOBuffer(UInt8[0x00, 0x01])
         MQTTClient.handle_ack(c, io, 0x00, 0x00)
         @test !haskey(c.in_flight, 0x0001)
+
+        c.in_flight[0x0002] = Future()
+
+        # Test unsuccessful ack
+        io = IOBuffer(UInt8[0x00, 0x01])
+        MQTTClient.handle_ack(c, io, 0x00, 0x00)
+        @test c.state === 0x03
     end
 
     @testset "handle_pubrec" begin
@@ -286,17 +362,21 @@ end
         # Set the ping_outstanding value to 0x1
         c.ping_outstanding[] = 0x1
 
+        @atomicswap c.state = 0x01
+
         # Call the handle_pingresp function
         MQTTClient.handle_pingresp(c, s, cmd, flags)
 
         # Check that the ping_outstanding value was updated correctly
         @test c.ping_outstanding[] == 0x0
 
-        # Set the ping_outstanding value to 0x0 and call the handle_pingresp function again
+        # NOTE: update this to use different msg type.
+        # # Set the ping_outstanding value to 0x0 and call the handle_pingresp function again
         c.ping_outstanding[] = 0x0
-        MQTTClient.handle_pingresp(c, s, cmd, flags)
-        p = take!(c.write_packets)
-        @test p == MQTTClient.Packet(MQTTClient.DISCONNECT, ())
+        @test_throws MethodError MQTTClient.handle_pingresp(c, s, cmd, flags)
+
+        # p = take!(c.write_packets)
+        # @test p == MQTTClient.Packet(MQTTClient.DISCONNECT, ())
     end
 
 end

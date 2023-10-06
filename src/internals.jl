@@ -32,6 +32,12 @@ const CONNACK_ERRORS = Dict{UInt8, String}(
                                            0x04 => "connection refused bad user name or password",
                                            0x05 => "connection refused not authorized",
                                           )
+
+const CLIENT_STATE = Dict{UInt8, Symbol}(
+                                        0x00 => :ready,
+                                        0x01 => :connected,
+                                        0x02 => :closed,
+                                        )
 ## Types
 
 """

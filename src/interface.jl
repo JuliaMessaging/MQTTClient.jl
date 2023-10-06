@@ -129,8 +129,22 @@ If the user name and password are provided in the `connection` object, they are 
 The function returns a `Future` object that can be used to track the progress of the connection.
 """
 function connect_async(client::Client, connection::MQTTConnection)
+    if !isready(client)
+            @atomicswap client.state = 0x00
+            client.on_msg = Dict{String,Function}()
+            client.last_id = 0x0000
+            client.in_flight = Dict{UInt16, Future}()
+            client.write_packets = Channel{Packet}(typemax(Int64))
+            client.socket = nothing
+            client.socket_lock = ReentrantLock()
+            client.ping_outstanding = Atomic{UInt8}(0)
+            client.last_sent = Atomic{Float64}()
+            client.last_received = Atomic{Float64}()
+            client.write_task = nothing
+            client.read_task = nothing
+            client.keep_alive_task = nothing
+    end
 
-    client.write_packets = @mqtt_channel
     try
         client.keep_alive = convert(UInt16, connection.keep_alive)
     catch
@@ -139,24 +153,18 @@ function connect_async(client::Client, connection::MQTTConnection)
 
     client.socket = connect(connection.protocol)
 
-    @debug "connect to host"
-    @async write_loop(client)
-    @async read_loop(client)
-    @debug "set backround procs"
+    client.write_task = @async write_loop(client)
+    client.read_task = @async read_loop(client)
 
     if client.keep_alive > 0x0000
-        @async keep_alive_loop(client)
+        client.keep_alive_task = @async keep_alive_loop(client)
     end
-
-    @debug "set keep alive"
 
     #TODO reset client on clean_session = true
 
     protocol_name = "MQTT"
     protocol_level = 0x04 # v3.1.1
     connect_flags = 0x02 # clean session
-
-    @debug "set protocol"
 
     local optional_user = ()
     local optional_will = ()
@@ -174,8 +182,6 @@ function connect_async(client::Client, connection::MQTTConnection)
         connect_flags |= 0x04 | ((connection.will.qos & 0x03) << 3) | ((connection.will.retain & 0x01) << 5)
     end
 
-    @debug "set optional fields"
-
     future = Future()
     client.in_flight[0x0000] = future
 
@@ -188,8 +194,6 @@ function connect_async(client::Client, connection::MQTTConnection)
                  optional_user...,
                  optional_will...)
 
-    @debug "write packets"
-
     return future
 end
 
@@ -201,7 +205,7 @@ Establishes a synchronous connection to an MQTT broker using the specified `clie
 
 This function is a wrapper around the `connect_async` function, which establishes an asynchronous connection. The `connect` function blocks until the connection is established by calling the `resolve` function on the `Future` object returned by `connect_async`.
 """
-connect(client::Client, connection::MQTTConnection) = resolve(connect_async(client, connection))
+connect(client::Client, connection::MQTTConnection) = fetch(connect_async(client, connection))
 
 
 """
@@ -210,11 +214,33 @@ connect(client::Client, connection::MQTTConnection) = resolve(connect_async(clie
 Disconnects the client from the broker and stops the tasks.
 """
 function disconnect(client::Client)
+    if !isconnected(client)
+        throw(MQTTException("Not Connected. Cannot Disconnect."))
+    end
+
+    @info "send disconnect"
     write_packet(client, DISCONNECT)
+    # @info "wait write close"
+    wait(client.write_task)
+
+    # @info "send stop msg"
+    @atomicreplace client.state 0x01 => 0x02
+
+    # @info "eof socket"
+    eof(client.socket)
+
+    wait(client.read_task)
+    # @info "reading done!"
+
+    # @info "close write channel"
     close(client.write_packets)
 
-    # FIXME: figure out what this does.
-    #wait(client.socket.closenotify)
+    # @info "close socket"
+    close(client.socket)
+
+    res = fetch(client)
+    @info "client state: $res"
+    res
 end
 
 """

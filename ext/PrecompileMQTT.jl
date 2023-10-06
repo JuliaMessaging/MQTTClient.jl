@@ -55,7 +55,7 @@ precompile(Tuple{typeof(Base.indexed_iterate), Tuple{Nothing, Int64}, Int64, Int
         publish_async(udsclient, topic, msg)
         publish_async(udsclient, topic, payload)
         unsubscribe_async(udsclient, topic)
-        disconnect(udsclient)
+        # disconnect(udsclient)
 
         tcpclient, tcpconnection = MakeConnection("test.mosquitto.org", 1883)
 
@@ -67,7 +67,7 @@ precompile(Tuple{typeof(Base.indexed_iterate), Tuple{Nothing, Int64}, Int64, Int
         publish_async(tcpclient, topic, msg)
         publish_async(tcpclient, topic, payload)
         unsubscribe_async(tcpclient, topic)
-        disconnect(tcpclient)
+        # disconnect(tcpclient)
     end
 end
 

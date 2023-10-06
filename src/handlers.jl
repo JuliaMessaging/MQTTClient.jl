@@ -21,10 +21,12 @@ function handle_connack(client::Client, s::IO, cmd::UInt8, flags::UInt8)
 
     future = client.in_flight[0x0000]
     if return_code == CONNECTION_ACCEPTED
+        @atomicreplace client.state 0x00 => 0x01
         put!(future, session_present)
     else
         #! TODO: This could be handled better maybe?
         error = CONNACK_ERRORS[return_code]
+        @atomicswap client.state = 0x03
         put!(future, MQTTException(error))
     end
 end
@@ -73,6 +75,7 @@ function handle_publish(client::Client, s::IO, cmd::UInt8, flags::UInt8)
             end
         catch e
             @error e
+            @atomicswap client.state = 0x03
         end
     end
 end
@@ -86,6 +89,7 @@ function handle_ack(client::Client, s::IO, cmd::UInt8, flags::UInt8)
         delete!(client.in_flight, id)
     else
         # TODO unexpected ack protocol error
+        @atomicswap client.state = 0x03
     end
 end
 
