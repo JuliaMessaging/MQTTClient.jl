@@ -6,7 +6,7 @@ A mutable struct representing an MQTT client.
 An MQTT client is any device (from a microcontroller up to a fully-fledged server) that runs an MQTT library and connects to an MQTT broker over a network. Information is organized in a hierarchy of topics.
 
 # Fields
-- `on_msg::Dict{String,Function}`: A dictionary mapping topic names to callback functions.
+- `on_msg::TrieNode`: A trie mapping topics to callback functions.
 - `keep_alive::UInt16`: The keep-alive time in seconds.
 - `last_id::UInt16`: The last packet identifier used.
 - `in_flight::Dict{UInt16, Future}`: A dictionary mapping packet identifiers to futures.

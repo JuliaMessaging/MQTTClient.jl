@@ -65,20 +65,21 @@ function handle_publish(client::Client, s::IO, cmd::UInt8, flags::UInt8)
 
     payload = take!(s)
     @info "handling publish" topic String(payload) client.on_msg haskey(client.on_msg, topic)
-    if haskey(client.on_msg, topic)
-        client.on_msg[topic](topic,payload)
-    else
-        try
-            options = Vector{String}(collect(keys(client.on_msg)))
-            matches = findall(t -> topic_eq(t, topic), options)
-            for topic_match in options[matches]
-                client.on_msg[topic_match](topic,payload)
-            end
-        catch e
-            @error e
-            @atomicswap client.state = 0x03
-        end
-    end
+    get(client.on_msg, topic, DefaultCB)(topic, payload)
+    # if haskey(client.on_msg, topic)
+    #     client.on_msg[topic](topic,payload)
+    # else
+    #     try
+    #         options = Vector{String}(collect(keys(client.on_msg)))
+    #         matches = findall(t -> topic_eq(t, topic), options)
+    #         for topic_match in options[matches]
+    #             client.on_msg[topic_match](topic,payload)
+    #         end
+    #     catch e
+    #         @error e
+    #         @atomicswap client.state = 0x03
+    #     end
+    # end
 end
 
 function handle_ack(client::Client, s::IO, cmd::UInt8, flags::UInt8)

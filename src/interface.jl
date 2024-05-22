@@ -131,7 +131,7 @@ The function returns a `Future` object that can be used to track the progress of
 function connect_async(client::Client, connection::MQTTConnection)
     if !isready(client)
             @atomicswap client.state = 0x00
-            client.on_msg = Dict{String,Function}()
+            client.on_msg = TrieNode()
             client.last_id = 0x0000
             client.in_flight = Dict{UInt16, Future}()
             client.write_packets = Channel{Packet}(typemax(Int64))
@@ -271,7 +271,7 @@ function subscribe_async(client, topic, on_msg; qos=QOS_0)
     id = packet_id(client)
     client.in_flight[id] = future
     write_packet(client, SUBSCRIBE | 0x02, id, topic, qos)
-    client.on_msg[topic] = on_msg
+    insert!(client.on_msg, topic, on_msg)
     return future
 end
 
@@ -307,7 +307,7 @@ function unsubscribe_async(client::Client, topics::String...)
     client.in_flight[id] = future
     topic_data = []
     write_packet(client, UNSUBSCRIBE | 0x02, id, topics...)
-    ((t) -> delete!(client.on_msg, t)).(topics)
+    ((t) -> remove!(client.on_msg, t)).(topics)
     return future
 end
 
