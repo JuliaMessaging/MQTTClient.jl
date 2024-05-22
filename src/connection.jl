@@ -33,7 +33,7 @@ A Unix domain socket, or IPC (inter-process communication) socket, is a data com
 """
 struct UDS <: AbstractIOConnection
     path::AbstractString
-    UDS(path::AbstractString = pdw()) = new(path)
+    UDS(path::AbstractString = pwd()) = new(path)
 end
 
 """

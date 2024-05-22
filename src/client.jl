@@ -24,7 +24,7 @@ An MQTT client is any device (from a microcontroller up to a fully-fledged serve
 mutable struct Client
     @atomic state::UInt8
 
-    on_msg::Dict{String,Function}
+    on_msg::TrieNode
     keep_alive::UInt16
 
     # TODO mutex?
@@ -32,36 +32,36 @@ mutable struct Client
     in_flight::Dict{UInt16, Future}
 
     write_packets::Channel{Packet}
-    socket
-    socket_lock # TODO add type
+    socket::IO
+    socket_lock::ReentrantLock
 
     ping_timeout::UInt64
 
     # TODO remove atomic?
-    ping_outstanding::Atomic{UInt8}
-    last_sent::Atomic{Float64}
-    last_received::Atomic{Float64}
+    @atomic ping_outstanding::UInt8
+    @atomic last_sent::Float64
+    @atomic last_received::Float64
 
-    write_task::Union{Nothing,Task}
-    read_task::Union{Nothing,Task}
-    keep_alive_task::Union{Nothing,Task}
+    write_task::Task
+    read_task::Task
+    keep_alive_task::Task
 
     Client(ping_timeout::UInt64=UInt64(60)) = new(
             0x00,
-            Dict{String,Function}(),
+            TrieNode(),
             0x0000,
             0x0000,
             Dict{UInt16, Future}(),
             Channel{Packet}(typemax(Int64)),
-            nothing,
+            stdout,
             ReentrantLock(),
             ping_timeout,
-            Atomic{UInt8}(0),
-            Atomic{Float64}(),
-            Atomic{Float64}(),
-            nothing,
-            nothing,
-            nothing
+            0,
+            0.0,
+            0.0,
+            Task(nothing),
+            Task(nothing),
+            Task(nothing)
         )
 end
 
@@ -82,27 +82,36 @@ Nothing.
 function write_loop(client::Client)::UInt8
     try
         while !isclosed(client)
-            packet = take!(client.write_packets)
-            buffer = PipeBuffer()
-            for i in packet.data
-                mqtt_write(buffer, i)
-            end
-            data = take!(buffer)
-            lock(client.socket_lock)
-            write(client.socket, packet.cmd)
-            write_len(client.socket, length(data))
-            write(client.socket, data)
-            unlock(client.socket_lock)
-            atomic_xchg!(client.last_sent, time())
+            if isready(client.write_packets)
+                packet = take!(client.write_packets)
+                buffer = PipeBuffer()
+                for i in packet.data
+                    mqtt_write(buffer, i)
+                end
+                data = take!(buffer)
+                lock(client.socket_lock)
+                write(client.socket, packet.cmd)
+                write_len(client.socket, length(data))
+                write(client.socket, data)
+                unlock(client.socket_lock)
+                @atomicswap client.last_sent = time()
 
-            if packet.cmd === DISCONNECT
-                break
+                @info "writeloop" packet
+
+                if packet.cmd === DISCONNECT
+                    @info "stopping write loop (DISCONNECT sent)"
+                    break
+                end
+            else
+                sleep(0.0001)
             end
         end
+        @info "ending loop!"
         return 0x00
     catch e
         # channel closed
         if isa(e, InvalidStateException)
+            @info "threw an InvalidStateException"
             close(client.socket)
             return 0x01
         else
@@ -137,8 +146,10 @@ function read_loop(client::Client)::UInt8
             cmd = cmd_flags & 0xF0
             flags = cmd_flags & 0x0F
 
+            @info "readloop" cmd data
+
             if haskey(HANDLERS, cmd)
-                atomic_xchg!(client.last_received, time())
+                @atomicswap client.last_received = time()
                 HANDLERS[cmd](client, buffer, cmd, flags)
             else
                 # TODO unexpected cmd protocol error
@@ -146,6 +157,7 @@ function read_loop(client::Client)::UInt8
         end
         return 0x00
     catch e
+        @info "got some kind of error" e
         # socket closed
         if !isa(e, EOFError)
             @atomicswap client.state = 0x03
@@ -173,15 +185,15 @@ function keep_alive_loop(client::Client)::UInt8
     timer = Timer(0, interval=check_interval)
 
     while !isclosed(client)
-        if time() - client.last_sent[] >= client.keep_alive || time() - client.last_received[] >= client.keep_alive
-            if client.ping_outstanding[] == 0x0
-                atomic_xchg!(client.ping_outstanding, 0x1)
+        if time() - @atomic(client.last_sent) >= client.keep_alive || time() - @atomic(client.last_received) >= client.keep_alive
+            if @atomic(client.ping_outstanding) == 0x0
+                @atomicswap client.ping_outstanding = 0x1
                 try
                     lock(client.socket_lock)
                     write(client.socket, PINGREQ)
                     write(client.socket, 0x00)
                     unlock(client.socket_lock)
-                    atomic_xchg!(client.last_sent, time())
+                    @atomicswap client.last_sent = time()
                 catch e
                     @atomicswap client.state = 0x03
                     if isa(e, InvalidStateException)
@@ -195,7 +207,7 @@ function keep_alive_loop(client::Client)::UInt8
             end
         end
 
-        if client.ping_outstanding[] == 1 && time() - ping_sent >= client.ping_timeout
+        if @atomic(client.ping_outstanding) == 1 && time() - ping_sent >= client.ping_timeout
             try # No pingresp received
                 disconnect(client)
                 break

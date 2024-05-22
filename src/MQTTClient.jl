@@ -11,6 +11,7 @@ using Base.Threads
 
 include("utils.jl")
 include("internals.jl")
+include("topic.jl")
 include("client.jl")
 include("connection.jl")
 include("handlers.jl")

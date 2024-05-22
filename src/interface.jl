@@ -135,14 +135,14 @@ function connect_async(client::Client, connection::MQTTConnection)
             client.last_id = 0x0000
             client.in_flight = Dict{UInt16, Future}()
             client.write_packets = Channel{Packet}(typemax(Int64))
-            client.socket = nothing
+            client.socket = stdout
             client.socket_lock = ReentrantLock()
-            client.ping_outstanding = Atomic{UInt8}(0)
-            client.last_sent = Atomic{Float64}()
-            client.last_received = Atomic{Float64}()
-            client.write_task = nothing
-            client.read_task = nothing
-            client.keep_alive_task = nothing
+            @atomicswap client.ping_outstanding = 0
+            @atomicswap client.last_sent = 0.0
+            @atomicswap client.last_received = 0.0
+            client.write_task = Task(nothing)
+            client.read_task = Task(nothing)
+            client.keep_alive_task = Task(nothing)
     end
 
     try
@@ -221,7 +221,9 @@ function disconnect(client::Client)
     @info "send disconnect"
     write_packet(client, DISCONNECT)
     # @info "wait write close"
-    wait(client.write_task)
+    if isa(client.write_task, Task)
+        wait(client.write_task)
+    end
 
     # @info "send stop msg"
     @atomicreplace client.state 0x01 => 0x02
@@ -229,7 +231,9 @@ function disconnect(client::Client)
     # @info "eof socket"
     eof(client.socket)
 
-    wait(client.read_task)
+    if isa(client.read_task, Task)
+        wait(client.read_task)
+    end
     # @info "reading done!"
 
     # @info "close write channel"

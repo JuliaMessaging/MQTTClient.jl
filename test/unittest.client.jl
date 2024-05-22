@@ -13,7 +13,7 @@ end
         @test isnothing(c.socket)
         @test c.socket_lock isa ReentrantLock
         @test c.ping_timeout == UInt64(60)
-        @test c.ping_outstanding[] == 0
+        @test @atomic c.ping_outstanding == 0
         # Test custom ping_timeout value
         ping_timeout = UInt64(30)
         c2 = MQTTClient.Client(ping_timeout)
@@ -360,7 +360,7 @@ end
         flags = 0x00
 
         # Set the ping_outstanding value to 0x1
-        c.ping_outstanding[] = 0x1
+        @atomicswap c.ping_outstanding = 0x1
 
         @atomicswap c.state = 0x01
 
@@ -368,11 +368,11 @@ end
         MQTTClient.handle_pingresp(c, s, cmd, flags)
 
         # Check that the ping_outstanding value was updated correctly
-        @test c.ping_outstanding[] == 0x0
+        @test @atomic(c.ping_outstanding) == 0x0
 
         # NOTE: update this to use different msg type.
         # # Set the ping_outstanding value to 0x0 and call the handle_pingresp function again
-        c.ping_outstanding[] = 0x0
+        @atomicswap c.ping_outstanding = 0x0
         @test_throws MethodError MQTTClient.handle_pingresp(c, s, cmd, flags)
 
         # p = take!(c.write_packets)

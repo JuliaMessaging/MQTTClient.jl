@@ -126,3 +126,5 @@ end
          throw(MQTTException("Invalid topic"))
      end
  end
+
+Base.wait(::Nothing) = sleep(0.001)

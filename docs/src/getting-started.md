@@ -44,7 +44,7 @@ broker = "test.mosquitto.org"
 
 #Define the callback for receiving messages.
 function on_msg(topic, payload)
-    info("Received message topic: [", topic, "] payload: [", String(payload), "]")
+    @info("Received message topic: [", topic, "] payload: [", String(payload), "]")
 end
 
 #Instantiate a client and connection.
@@ -54,7 +54,7 @@ connect(client, connection)
 #to this topic.
 publish(client, "jlExample", "Hello World!", retain=true)
 #Subscribe to the topic we sent a retained message to.
-subscribe(client, "jlExample", on_msg, qos=QOS_1))
+subscribe(client, "jlExample", on_msg, qos=QOS_1)
 #Unsubscribe from the topic
 unsubscribe(client, "jlExample")
 #Disconnect from the broker. Not strictly needed as the broker will also

@@ -64,14 +64,15 @@ function handle_publish(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     end
 
     payload = take!(s)
+    @info "handling publish" topic String(payload) client.on_msg haskey(client.on_msg, topic)
     if haskey(client.on_msg, topic)
-        @async client.on_msg[topic](topic,payload)
+        client.on_msg[topic](topic,payload)
     else
         try
             options = Vector{String}(collect(keys(client.on_msg)))
             matches = findall(t -> topic_eq(t, topic), options)
             for topic_match in options[matches]
-                @async client.on_msg[topic_match](topic,payload)
+                client.on_msg[topic_match](topic,payload)
             end
         catch e
             @error e
@@ -110,8 +111,8 @@ function handle_suback(client::Client, s::IO, cmd::UInt8, flags::UInt8)
 end
 
 function handle_pingresp(client::Client, s::IO, cmd::UInt8, flags::UInt8)
-    if client.ping_outstanding[] == 0x1
-        atomic_xchg!(client.ping_outstanding, 0x0)
+    if @atomic(client.ping_outstanding) == 0x1
+        @atomicswap client.ping_outstanding = 0x0
     else
         # We received a subresp packet we didn't ask for
         disconnect(client)
