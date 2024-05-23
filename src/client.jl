@@ -6,6 +6,7 @@ A mutable struct representing an MQTT client.
 An MQTT client is any device (from a microcontroller up to a fully-fledged server) that runs an MQTT library and connects to an MQTT broker over a network. Information is organized in a hierarchy of topics.
 
 # Fields
+- `state::UInt8`: client state.
 - `on_msg::TrieNode`: A trie mapping topics to callback functions.
 - `keep_alive::UInt16`: The keep-alive time in seconds.
 - `last_id::UInt16`: The last packet identifier used.
@@ -28,8 +29,8 @@ mutable struct Client
     keep_alive::UInt16
 
     # TODO mutex?
-    last_id::UInt16
-    in_flight::Dict{UInt16, Future}
+    @atomic last_id::UInt16
+    in_flight::Dict{UInt16,Future}
 
     write_packets::Channel{Packet}
     socket::IO
@@ -46,23 +47,23 @@ mutable struct Client
     read_task::Task
     keep_alive_task::Task
 
-    Client(ping_timeout::UInt64=UInt64(60)) = new(
-            0x00,
-            TrieNode(),
-            0x0000,
-            0x0000,
-            Dict{UInt16, Future}(),
-            Channel{Packet}(typemax(Int64)),
-            stdout,
-            ReentrantLock(),
-            ping_timeout,
-            0,
-            0.0,
-            0.0,
-            Task(nothing),
-            Task(nothing),
-            Task(nothing)
-        )
+    Client(ping_timeout::UInt64 = UInt64(60)) = new(
+        0x00,
+        TrieNode(),
+        0x0000,
+        0x0000,
+        Dict{UInt16,Future}(),
+        Channel{Packet}(typemax(Int64)),
+        stdout,
+        ReentrantLock(),
+        ping_timeout,
+        0x00,
+        0.0,
+        0.0,
+        Task(nothing),
+        Task(nothing),
+        Task(nothing),
+    )
 end
 
 
@@ -96,7 +97,7 @@ function write_loop(client::Client)::UInt8
                 unlock(client.socket_lock)
                 @atomicswap client.last_sent = time()
 
-                @info "writeloop" packet
+                # @info "writeloop" packet
 
                 if packet.cmd === DISCONNECT
                     @info "stopping write loop (DISCONNECT sent)"
@@ -146,7 +147,7 @@ function read_loop(client::Client)::UInt8
             cmd = cmd_flags & 0xF0
             flags = cmd_flags & 0x0F
 
-            @info "readloop" cmd data
+            # @info "readloop" cmd data
 
             if haskey(HANDLERS, cmd)
                 @atomicswap client.last_received = time()
@@ -182,10 +183,11 @@ function keep_alive_loop(client::Client)::UInt8
     else
         check_interval = client.keep_alive / 2
     end
-    timer = Timer(0, interval=check_interval)
+    timer = Timer(0, interval = check_interval)
 
     while !isclosed(client)
-        if time() - @atomic(client.last_sent) >= client.keep_alive || time() - @atomic(client.last_received) >= client.keep_alive
+        if time() - @atomic(client.last_sent) >= client.keep_alive ||
+           time() - @atomic(client.last_received) >= client.keep_alive
             if @atomic(client.ping_outstanding) == 0x0
                 @atomicswap client.ping_outstanding = 0x1
                 try
@@ -207,7 +209,8 @@ function keep_alive_loop(client::Client)::UInt8
             end
         end
 
-        if @atomic(client.ping_outstanding) == 1 && time() - ping_sent >= client.ping_timeout
+        if @atomic(client.ping_outstanding) == 1 &&
+           time() - ping_sent >= client.ping_timeout
             try # No pingresp received
                 disconnect(client)
                 break
@@ -228,12 +231,11 @@ function keep_alive_loop(client::Client)::UInt8
     return 0x00
 end
 
-# TODO needs mutex
-function packet_id(client)
+function packet_id(client::Client)::UInt16
     if client.last_id == typemax(UInt16)
-        client.last_id = 0
+        @atomicreplace client.last_id typemax(UInt16) => 0x0000
     end
-    client.last_id += 1
+    @atomic client.last_id + 0x0001
     return client.last_id
 end
 
@@ -247,9 +249,12 @@ isconnected(client::Client)::Bool = client.state == 0x01
 isclosed(client::Client)::Bool = client.state >= 0x02
 iserror(client::Client)::Bool = client.state == 0x03
 
-show(io::IO, client::Client) = print(io, "MQTTClient(Topic Subscriptions: $(collect(keys(client.on_msg))))")
+show(io::IO, client::Client) = print(
+    io,
+    "MQTTClient[state: $(get(CLIENT_STATE, client.state, :unknown)), read_loop: $(taskstatus(client.read_task)), write_loop: $(taskstatus(client.write_task)), keep_alive: $(taskstatus(client.keep_alive_task))]\n$(show_tree(client.on_msg))",
+)
 
-fetch(client::Client)::Tuple{UInt8,UInt8, UInt8} = begin
+fetch(client::Client)::Tuple{UInt8,UInt8,UInt8} = begin
     try
         wres = isnothing(client.write_task) ? 0x00 : fetch(client.write_task)
         rres = isnothing(client.read_task) ? 0x00 : fetch(client.read_task)

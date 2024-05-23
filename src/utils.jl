@@ -128,3 +128,15 @@ end
  end
 
 Base.wait(::Nothing) = sleep(0.001)
+
+function taskstatus(t::Task)
+    if istaskdone(t)
+        :done
+    elseif istaskfailed(t)
+        :failed
+    elseif istaskstarted(t)
+        :running
+    else
+        :ready
+    end
+end

@@ -5,22 +5,22 @@ end
 @testset verbose = true "MQTT Client functionality" begin
     @testset "Client" begin
         c = MQTTClient.Client()
-        @test c.on_msg isa Dict
+        @test c.on_msg isa MQTTClient.TrieNode
         @test c.keep_alive == 0x0000
         @test c.last_id == 0x0000
         @test isempty(c.in_flight)
         @test c.write_packets isa AbstractChannel
-        @test isnothing(c.socket)
+        @test c.socket == stdout
         @test c.socket_lock isa ReentrantLock
         @test c.ping_timeout == UInt64(60)
-        @test @atomic c.ping_outstanding == 0
+        @test @atomic(c.ping_outstanding) == 0x00
         # Test custom ping_timeout value
         ping_timeout = UInt64(30)
         c2 = MQTTClient.Client(ping_timeout)
         @test c2.ping_timeout == ping_timeout
-        # Test that last_sent and last_received are initialized to NaN
-        @test c2.last_sent.value == 0
-        @test c2.last_received.value == 0
+        # Test that last_sent and last_received are initialized to 0.0
+        @test @atomic(c2.last_sent) == 0.0
+        @test @atomic(c2.last_received) == 0.0
     end
 
     @testset "MQTT Message" begin
@@ -132,7 +132,7 @@ end
         client, conn = MQTTClient.MakeConnection("localhost", 1883)
         show(io, client)
         str = take!(io) |> String
-        @test str == "MQTTClient(Topic Subscriptions: String[])"
+        @test str == "MQTTClient(Topic Subscriptions: Any[])"
     end
     @testset "Test Connection show function" begin
         io = IOBuffer()
