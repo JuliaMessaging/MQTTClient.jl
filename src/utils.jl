@@ -1,35 +1,14 @@
 """
-    mqtt_channel(len::Number=128)
-
-A macro that declares a data channel based on the number of threads available.
-If more than one thread is available, it returns a `RemoteChannel` with a `Channel{Packet}` of length `len`.
-Otherwise, it returns a `Channel{Packet}` of length `len`.
-
-# Arguments
-- `len::Number=128`: The length of the channel. Defaults to 128.
-
-# Examples
-```julia
-@mqtt_channel  # Returns a Channel{Packet} of length 128
-@mqtt_channel 64  # Returns a Channel{Packet} of length 64
-```
-"""
-# Disabled for now until a scheduler can be configured properly
-# macro mqtt_channel(len::Number=128)
-#     return Threads.nthreads() > 1 ? :(RemoteChannel(()->Channel{Packet}($len))) : :(Channel{Packet}($len))
-# end
-
-"""
     topic_eq(baseT::String, compareT::String)
 
-A macro that compares two MQTT topics and returns a boolean value based on their equality. If the `baseT` topic contains a wildcard character `#`, the macro checks if the `compareT` topic contains the string before the wildcard character. Otherwise, it checks if the two topics are equal.
+A function that compares two MQTT topics and returns a boolean value based on their equality. If the `baseT` topic contains a wildcard character `#`, the macro checks if the `compareT` topic contains the string before the wildcard character. Otherwise, it checks if the two topics are equal.
 
 # Examples
 ```julia
-julia> @topic_eq "sport/#" "sport/tennis"
+julia> topic_eq("sport/#", "sport/tennis")
 true
 
-julia> @topic_eq "sport/tennis" "sport/football"
+julia> topic_eq("sport/tennis", "sport/football")
 false
 ```
 """
