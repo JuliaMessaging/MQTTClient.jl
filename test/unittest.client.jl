@@ -10,7 +10,7 @@ end
         @test c.last_id == 0x0000
         @test isempty(c.in_flight)
         @test c.write_packets isa AbstractChannel
-        @test c.socket == stdout
+        @test c.socket isa IOBuffer
         @test c.socket_lock isa ReentrantLock
         @test c.ping_timeout == UInt64(60)
         @test @atomic(c.ping_outstanding) == 0x00
@@ -57,7 +57,7 @@ end
 
     @testset "packet_id" begin
         c = MQTTClient.Client()
-        c.last_id = typemax(UInt16)
+        @atomicswap c.last_id = typemax(UInt16)
         @test MQTTClient.packet_id(c) == 1
     end
 
@@ -132,7 +132,7 @@ end
         client, conn = MQTTClient.MakeConnection("localhost", 1883)
         show(io, client)
         str = take!(io) |> String
-        @test str == "MQTTClient(Topic Subscriptions: Any[])"
+        @test str == "MQTTClient[state: ready, read_loop: ready, write_loop: ready, keep_alive: ready]\n"
     end
     @testset "Test Connection show function" begin
         io = IOBuffer()
@@ -144,7 +144,8 @@ end
 
     @testset "MQTT subscribe async" begin
         c = MQTTClient.Client()
-        fut = MQTTClient.subscribe_async(c, "test-topic/#", ((p) -> p), qos=MQTTClient.QOS_2)
+        cb(p...) = print(p)
+        fut = MQTTClient.subscribe_async(c, "test-topic/#", cb, qos=MQTTClient.QOS_2)
         @test fut isa Distributed.Future
     end
 
@@ -158,11 +159,12 @@ end
         # Create a mock client object
         client = MQTTClient.Client()
 
-        client.on_msg["topic1"] = ((p) -> p)
+        cb(p...) = print(p)
+        insert!(client.on_msg, "topic1", cb)
 
         # Set the packet ID
         id = 1
-        client.last_id = id
+        @atomicswap client.last_id = id
 
         # Call the unsubscribe_async function with a single topic
         future = unsubscribe_async(client, "topic1")
@@ -174,10 +176,12 @@ end
         p = take!(client.write_packets)
         @test p == MQTTClient.Packet(MQTTClient.UNSUBSCRIBE  | 0x02, (0x0002, "topic1"))
 
-
-        client.on_msg["topic1"] = ((p) -> p)
-        client.on_msg["topic2"] = ((p) -> p)
-        client.on_msg["topic3"] = ((p) -> p)
+        cb1(x...) = print("[1] ", x)
+        cb2(x...) = print("[2] ", x)
+        cb3(x...) = print("[3] ", x)
+        MQTTClient.insert!(client.on_msg, "topic1", cb1)
+        MQTTClient.insert!(client.on_msg, "topic2", cb2)
+        MQTTClient.insert!(client.on_msg, "topic3", cb3)
         # Call the unsubscribe_async function with multiple topics
         future = unsubscribe_async(client, "topic1", "topic2", "topic3")
 
@@ -217,8 +221,10 @@ end
         #! TODO: fix this test.
         c = MQTTClient.Client()
         ch = Channel{String}(5)
-        c.on_msg["test"] = (t,p) -> put!(ch, strip(String(p),'\0'))
-        c.on_msg["test/#"] = (t,p) -> put!(ch, strip(String(p),'\0'))
+        cb1(t,p) = put!(ch, strip(String(p),'\0'))
+        cb2(t,p) = put!(ch, strip(String(p),'\0'))
+        insert!(c.on_msg, "test", cb1)
+        insert!(c.on_msg, "test/#", cb2)
 
         message = MQTTClient.Message(false, UInt8(MQTTClient.QOS_0), false, "test", "payload")
         optional = message.qos == 0x00 ? () : (0)
@@ -368,12 +374,13 @@ end
         MQTTClient.handle_pingresp(c, s, cmd, flags)
 
         # Check that the ping_outstanding value was updated correctly
-        @test @atomic(c.ping_outstanding) == 0x0
+        @test c.ping_outstanding == 0x0
 
         # NOTE: update this to use different msg type.
         # # Set the ping_outstanding value to 0x0 and call the handle_pingresp function again
-        @atomicswap c.ping_outstanding = 0x0
-        @test_throws MethodError MQTTClient.handle_pingresp(c, s, cmd, flags)
+        # @atomicreplace c.state 0x01 => 0x02
+        # @atomicswap c.ping_outstanding = 0x0
+        @test_throws ArgumentError MQTTClient.handle_pingresp(c, s, cmd, flags)
 
         # p = take!(c.write_packets)
         # @test p == MQTTClient.Packet(MQTTClient.DISCONNECT, ())

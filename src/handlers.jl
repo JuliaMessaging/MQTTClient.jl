@@ -67,8 +67,8 @@ function handle_publish(client::Client, s::IO, cmd::UInt8, flags::UInt8)
         payload = take!(s)
         get(client.on_msg, topic, DefaultCB)(topic, payload)
     catch e
-        @error e
-        @error stacktrace(catch_backtrace())
+        # @error e
+        # @error stacktrace(catch_backtrace())
         @atomicswap client.state = 0x03
         rethrow()
     end
@@ -100,7 +100,12 @@ end
 function handle_suback(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     id = mqtt_read(s, UInt16)
     return_codes = take!(s)
-    put!(client.in_flight[id], return_codes)
+    if haskey(client.in_flight, id)
+        put!(client.in_flight[id], return_codes)
+    else
+        # TODO unexpected inflight message ack
+        @atomicswap client.state = 0x03
+    end
 end
 
 function handle_pingresp(client::Client, s::IO, cmd::UInt8, flags::UInt8)
@@ -108,7 +113,9 @@ function handle_pingresp(client::Client, s::IO, cmd::UInt8, flags::UInt8)
         @atomicswap client.ping_outstanding = 0x0
     else
         # We received a subresp packet we didn't ask for
-        disconnect(client)
+        # disconnect(client)
+        @atomicswap client.state = 0x03
+        throw(ArgumentError("No outstanding ping. client.ping_outstanding = $(client.ping_outstanding) and should be 0x1"))
     end
 end
 

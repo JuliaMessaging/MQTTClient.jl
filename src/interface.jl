@@ -132,10 +132,10 @@ function connect_async(client::Client, connection::MQTTConnection)
     if !isready(client)
             @atomicswap client.state = 0x00
             client.on_msg = TrieNode()
-            client.last_id = 0x0000
+            @atomicswap client.last_id = 0x0000
             client.in_flight = Dict{UInt16, Future}()
             client.write_packets = Channel{Packet}(typemax(Int64))
-            client.socket = stdout
+            client.socket = IOBuffer()
             client.socket_lock = ReentrantLock()
             @atomicswap client.ping_outstanding = 0
             @atomicswap client.last_sent = 0.0
@@ -218,32 +218,25 @@ function disconnect(client::Client)
         throw(MQTTException("Not Connected. Cannot Disconnect."))
     end
 
-    @info "send disconnect"
     write_packet(client, DISCONNECT)
-    # @info "wait write close"
     if isa(client.write_task, Task)
         wait(client.write_task)
     end
 
-    # @info "send stop msg"
     @atomicreplace client.state 0x01 => 0x02
 
-    # @info "eof socket"
     eof(client.socket)
 
     if isa(client.read_task, Task)
         wait(client.read_task)
     end
-    # @info "reading done!"
 
-    # @info "close write channel"
     close(client.write_packets)
 
-    # @info "close socket"
     close(client.socket)
 
     res = fetch(client)
-    @info "client state: $res"
+    @debug "MQTT client disconnected with async task states: $res"
     res
 end
 
@@ -267,6 +260,7 @@ future = subscribe_async(client, "my/topic", on_msg, qos=QOS_2)
 ```
 """
 function subscribe_async(client, topic, on_msg; qos=QOS_0)
+    filter_wildcard_len_check(topic)
     future = Future()
     id = packet_id(client)
     client.in_flight[id] = future

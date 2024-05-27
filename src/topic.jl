@@ -55,8 +55,6 @@ function trie_lookup(node::TrieNode, part::AbstractString, topic_parts::Vector)
     )
     multi = get(node.children, "#", nothing)
 
-    #@info "state is" topic wildcard multi part topic_parts node haskey(node.children, "+")
-
     something(topic, wildcard, multi, Some(nothing))
 end
 
@@ -65,7 +63,6 @@ function Base.insert!(root::TrieNode, key::String, fn::Function)
     key_parts = eachsplit(key, '/', keepempty = true)
     node = root
     for (idx, part) in enumerate(key_parts)
-        #@info "ittr" idx part node
         if idx === depth
             #@info "reached base node"
             node.children[part] = TrieNode(get(node.children, part, nothing), fn)

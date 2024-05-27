@@ -54,7 +54,7 @@ mutable struct Client
         0x0000,
         Dict{UInt16,Future}(),
         Channel{Packet}(typemax(Int64)),
-        stdout,
+        IOBuffer(),
         ReentrantLock(),
         ping_timeout,
         0x00,
@@ -97,30 +97,31 @@ function write_loop(client::Client)::UInt8
                 unlock(client.socket_lock)
                 @atomicswap client.last_sent = time()
 
-                # @info "writeloop" packet
-
                 if packet.cmd === DISCONNECT
-                    @info "stopping write loop (DISCONNECT sent)"
+                    @debug "stopping write loop (DISCONNECT sent)"
                     break
                 end
             else
                 sleep(0.0001)
             end
         end
-        @info "ending loop!"
+        @debug "ending write loop!"
         return 0x00
     catch e
-        # channel closed
-        if isa(e, InvalidStateException)
-            @info "threw an InvalidStateException"
-            close(client.socket)
-            return 0x01
-        else
-            @error "WRITE LOOP ERROR"
-            @error stacktrace(catch_backtrace())
+        @debug "Write Loop threw an $(typeof(e))"
+        if !isa(e, InvalidStateException)
             @atomicswap client.state = 0x03
-            rethrow(e)
+            ### Uncomment this for debugging the (async) write loop.
+            # @error "WRITE LOOP ERROR"
+            # for (exc, bt) in current_exceptions()
+            #    showerror(stdout, exc, bt)
+            #    println(stdout)
+            # end
+            rethrow()
         end
+        # channel closed
+        close(client.socket)
+        return 0x01
     end
 end
 
@@ -140,32 +141,40 @@ read_loop(client)
 function read_loop(client::Client)::UInt8
     try
         while !isclosed(client)
-            cmd_flags = read(client.socket, UInt8)
-            len = read_len(client.socket)
-            data = read(client.socket, len)
-            buffer = PipeBuffer(data)
-            cmd = cmd_flags & 0xF0
-            flags = cmd_flags & 0x0F
+            if !eof(client.socket)
+                cmd_flags = read(client.socket, UInt8)
+                len = read_len(client.socket)
+                data = read(client.socket, len)
+                buffer = PipeBuffer(data)
+                cmd = cmd_flags & 0xF0
+                flags = cmd_flags & 0x0F
 
-            # @info "readloop" cmd data
-
-            if haskey(HANDLERS, cmd)
-                @atomicswap client.last_received = time()
-                HANDLERS[cmd](client, buffer, cmd, flags)
+                if haskey(HANDLERS, cmd)
+                    @atomicswap client.last_received = time()
+                    HANDLERS[cmd](client, buffer, cmd, flags)
+                else
+                    # TODO unexpected cmd protocol error
+                end
             else
-                # TODO unexpected cmd protocol error
+                sleep(0.0001)
             end
         end
+
+        @debug "ending write loop!"
         return 0x00
     catch e
-        @info "got some kind of error" e
-        # socket closed
+        @debug "Read Loop threw a $(typeof(e)) Exception."
         if !isa(e, EOFError)
             @atomicswap client.state = 0x03
-            @error "READ LOOP ERROR"
-            @error stacktrace(catch_backtrace())
-            rethrow(e)
+            ### Uncomment this for debugging the (async) read loop.
+            # @error "READ LOOP ERROR"
+            # for (exc, bt) in current_exceptions()
+            #    showerror(stdout, exc, bt)
+            #    println(stdout)
+            # end
+            rethrow()
         end
+        # socket closed
         return 0x01
     end
 end
