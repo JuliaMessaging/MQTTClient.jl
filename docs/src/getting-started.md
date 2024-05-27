@@ -23,10 +23,6 @@ Samples are available in the `examples` directory.
 using MQTTClient
 ```
 
-Advanced Usage
---------------
-The _read_loop_, _write_loop_ _keep_alive_loop_, and _on_msg_ callback are all called as async processes via `@async`.
-
 ## Getting started
 To use this library you need to follow at least these steps:
 1. Create an `MQTTConnection` struct for a given broker and protocol.
@@ -75,3 +71,5 @@ For storing messages that are awaiting acknowledgment, `Client` has a `Dict`, ma
 Once the connect method is called on a `Client`, relevant fields are initialized and the julia `connect` method is called to get a connected socket. Then two background tasks are started that perpetually check for messages to send and receive. If `keep_alive` is non-zero another tasks get started that handles sending the keep alive and verifying the pingresp arrived in time.
 
 TODO explain read and write loop a bit
+
+TODO explain topic trie structure
