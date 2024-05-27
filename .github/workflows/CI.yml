@@ -42,7 +42,7 @@ jobs:
       - name: Run mosquitto broker
         run: |
           sudo systemctl stop mosquitto
-          sudo cp ${{ github.workspace }}/test/mosquitto.test.config /etc/mosquitto/conf.d/test.conf
+          sudo cp ${{ github.workspace }}/test/testclient/mosquitto.test.config /etc/mosquitto/conf.d/test.conf
           sudo sed -i -e "s/password_file mosquitto.test.passwordfile/password_file \/etc\/mosquitto\/passwordfile/g" /etc/mosquitto/conf.d/test.conf
           sudo mosquitto_passwd -c -b /etc/mosquitto/passwordfile test test
           sudo systemctl restart mosquitto
