@@ -37,6 +37,12 @@ struct UDS <: AbstractIOConnection
 end
 
 """
+    MockIOConnection
+A struct to signify there is no connection to a MQTT Broker. should be used for testing.
+"""
+struct MockIOConnection <: AbstractIOConnection end
+
+"""
     IOConnection(ip::IPAddr, port::Int64)
 
 Constructs a new `TCP` object with the specified IP address and port number.
@@ -76,6 +82,7 @@ Constructs a new `UDS` object with the specified file system path.
 IOConnection(ip::IPAddr, port::Int64) = TCP(ip, port)
 IOConnection(ip::String, port::Int64) = TCP(getaddrinfo(ip), port)
 IOConnection(path::AbstractString) = UDS(path)
+IOConnection() = MockIOConnection()
 
 """
     connect(protocol::UDS) -> PipeEndpoint
@@ -89,6 +96,13 @@ connect(protocol::UDS) = connect(protocol.path)
 Establishes a TCP connection to the given IP address and port specified in the `TCP` struct.
 """
 connect(protocol::TCP) = connect(protocol.ip, protocol.port)
+
+"""
+    connect(protocol::MockIOConnection) -> IOBuffer
+
+Mocks a connection to an MQTT Broker with a local IOBuffer. Should only be used for testing.
+"""
+connect(protocol::MockIOConnection) = IOBuffer()
 
 
 """
