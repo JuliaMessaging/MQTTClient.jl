@@ -25,9 +25,9 @@ using MQTTClient
 
 ## Getting started
 To use this library you need to follow at least these steps:
-1. Create an `MQTTConnection` struct for a given broker and protocol.
+1. Create an `Connection` struct for a given broker and protocol.
 2. Create an instance of the `Client` struct.
-3. Call the connect method with your `Client` and `MQTTConnection` instance.
+3. Call the connect method with your `Client` and `Connection` instance.
 4. Exchange data with the broker through publish, subscribe and unsubscribe. When subscribing, pass your `on_msg` function for that topic.
 5. Disconnect from the broker. (Not strictly necessary, if you don't want to resume the session but considered good form and less likely to crash).
 

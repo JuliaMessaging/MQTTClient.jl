@@ -6,7 +6,7 @@ Connects the `Client` instance to the specified broker. There is a synchronous a
 #### Arguments
 **Required arguments:**
 * **client**::Client: The client to connect to the broker.
-* **connection**::MQTTConnection: The information for how the client connects to the broker.
+* **connection**::Connection: The information for how the client connects to the broker.
 
 use `MakeConnection` to get the client and the connection objects. 
 

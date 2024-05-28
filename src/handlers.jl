@@ -82,8 +82,7 @@ function handle_pingresp(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     if @atomic(client.ping_outstanding) == 0x1
         @atomicswap client.ping_outstanding = 0x0
     else
-        # We received a subresp packet we didn't ask for
-        # disconnect(client)
+        # We received a ping resp packet we didn't ask for
         @atomicswap client.state = 0x03
         throw(ArgumentError("No outstanding ping. client.ping_outstanding = $(client.ping_outstanding) and should be 0x1"))
     end

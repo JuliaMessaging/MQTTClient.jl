@@ -2,7 +2,7 @@ module MQTTClient
 
 using Distributed: Future, myid, remotecall, RemoteChannel
 using Sockets: TCPSocket, IPAddr, PipeServer, getaddrinfo
-import Sockets: connect
+import Sockets: connect, listen, accept
 using Random: randstring
 import Base: ReentrantLock, lock, unlock, convert, PipeEndpoint, fetch, show
 import Base: @atomic, @atomicreplace, @atomicswap, Ref, RefValue, isready
@@ -20,7 +20,7 @@ include("interface.jl")
 export
     MakeConnection,
     Client,
-    MQTTConnection,
+    Connection,
     IOConnection,
     MQTTException,
     User,
@@ -35,6 +35,5 @@ export
     unsubscribe,
     publish_async,
     publish,
-    disconnect,
-    MQTT_ERR_INVAL
+    disconnect
 end

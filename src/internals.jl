@@ -42,6 +42,8 @@ const CLIENT_STATE = Dict{UInt8, Symbol}(
 
 abstract type AbstractIOConnection end
 
+abstract type AbstractConfigElement end
+
 AbstractProtocol = Union{PipeEndpoint, TCPSocket}
 
 ## Enums

@@ -4,7 +4,7 @@ using MQTTClient
 using Distributed, Random
 
 import MQTTClient: topic_wildcard_len_check, filter_wildcard_len_check, MQTTException, Packet
-import Sockets: TCPSocket, PipeServer, connect, localhost, getaddrinfo, IOError, DNSError
+import Sockets: TCPSocket, PipeServer, connect, localhost, getaddrinfo, IOError, DNSError, @ip_str
 import Base.PipeEndpoint
 
 @testset verbose=true "client tests" begin
@@ -15,6 +15,9 @@ end
 end
 @testset verbose=true "topic trie tests" begin
     include("unittest.topic.jl")
+end
+@testset verbose=true "integration tests" begin
+   include("integration.test.jl") 
 end
 
 # These tests need a mqtt broker running.

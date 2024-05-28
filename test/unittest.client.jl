@@ -76,7 +76,7 @@ end
 
 @testset verbose = true "MQTT Connection functionality" begin
     @testset "MQTT TCP Connection from ip" begin
-        conn = MQTTClient.MQTTConnection(MQTTClient.IOConnection(localhost, 1883))
+        conn = MQTTClient.Connection(MQTTClient.IOConnection(localhost, 1883))
         @test conn.protocol isa MQTTClient.TCP
         @test conn.protocol.ip == localhost
         @test conn.keep_alive == 32
@@ -87,7 +87,7 @@ end
     end
 
     @testset "MQTT TCP Connection from string" begin
-        conn = MQTTClient.MQTTConnection(MQTTClient.IOConnection("localhost", 1883))
+        conn = MQTTClient.Connection(MQTTClient.IOConnection("localhost", 1883))
         @test conn.protocol isa MQTTClient.TCP
         @test conn.protocol.ip == getaddrinfo("localhost")
         @test conn.keep_alive == 32
@@ -99,7 +99,7 @@ end
 
     @testset "MQTT UDS Connection" begin
         path = "/tmp/mqtt.sock"
-        conn = MQTTClient.MQTTConnection(MQTTClient.IOConnection(path))
+        conn = MQTTClient.Connection(MQTTClient.IOConnection(path))
         @test conn.protocol isa MQTTClient.UDS
         @test conn.protocol.path == path
         @test conn.keep_alive == 32
@@ -115,16 +115,16 @@ end
     @testset "Make MQTT tcp connection" begin
         c, conn = MQTTClient.MakeConnection("localhost", 1883)
         @test c isa MQTTClient.Client
-        @test conn isa MQTTClient.MQTTConnection
+        @test conn isa MQTTClient.Connection
         c, conn = MQTTClient.MakeConnection(localhost, 1883)
         @test c isa MQTTClient.Client
-        @test conn isa MQTTClient.MQTTConnection
+        @test conn isa MQTTClient.Connection
     end
 
     @testset "Make MQTT uds connection" begin
         c, conn = MQTTClient.MakeConnection("/tmp/mqtt.sock")
         @test c isa MQTTClient.Client
-        @test conn isa MQTTClient.MQTTConnection
+        @test conn isa MQTTClient.Connection
     end
     
     @testset "Test Client show function" begin
@@ -139,7 +139,7 @@ end
         client, conn = MQTTClient.MakeConnection("localhost", 1883, client_id="foo")
         show(io, conn)
         str = take!(io) |> String
-        @test contains(str, "MQTTConnection(Protocol: MQTTClient.TCP")
+        @test contains(str, "Connection(Protocol: MQTTClient.TCP")
     end
 
     @testset "MQTT subscribe async" begin

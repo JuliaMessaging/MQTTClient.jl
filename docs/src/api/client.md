@@ -1,6 +1,6 @@
 ```@docs
 Client
-MQTTConnection
+Connection
 IOConnection
 MQTTClient.Message
 User

@@ -25,7 +25,7 @@ This client uses atomic operations to ensure thread safety for shared variables 
 # Constructor
 `Client(ping_timeout::UInt64=UInt64(60))` constructs a new `Client` object with the specified ping timeout (default: 60 seconds).
 """
-mutable struct Client
+mutable struct Client <: AbstractConfigElement
     @atomic state::UInt8
 
     on_msg::TrieNode
@@ -161,11 +161,9 @@ end
 function keep_alive_loop(client::Client)::UInt8
     ping_sent = time()
 
-    if client.keep_alive > 10
-        check_interval = 5
-    else
-        check_interval = client.keep_alive / 2
-    end
+    # TODO: improve, this causes reconnect to take ~1 second. is there a way to interupt?
+    check_interval = 1
+     
     timer = Timer(0, interval = check_interval)
 
     while !isclosed(client)

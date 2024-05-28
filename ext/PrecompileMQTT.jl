@@ -8,38 +8,38 @@ using Sockets
 
 using MQTTClient
 
-precompile(Tuple{typeof(Core.kwcall), NamedTuple{(:qos,), Tuple{MQTTClient.QOS}}, typeof(MQTTClient.subscribe), MQTTClient.Client, String, Function})
-precompile(Tuple{typeof(Core.kwcall), NamedTuple{(:qos,), Tuple{MQTTClient.QOS}}, typeof(MQTTClient.publish), MQTTClient.Client, String, String})
+# precompile(Tuple{typeof(Core.kwcall), NamedTuple{(:qos,), Tuple{MQTTClient.QOS}}, typeof(MQTTClient.subscribe), MQTTClient.Client, String, Function})
+# precompile(Tuple{typeof(Core.kwcall), NamedTuple{(:qos,), Tuple{MQTTClient.QOS}}, typeof(MQTTClient.publish), MQTTClient.Client, String, String})
 
-precompile(Tuple{typeof(Base.convert), Type{MQTTClient.Packet}, MQTTClient.Packet})
-precompile(Tuple{typeof(Base.write), Base.PipeEndpoint, Array{UInt8, 1}})
-precompile(Tuple{typeof(Base.read), Base.PipeEndpoint, Type{UInt8}})
-precompile(Tuple{typeof(Base.indexed_iterate), Tuple{Nothing, Int64}, Int64})
-precompile(Tuple{typeof(Base.read), Base.PipeEndpoint, Int64})
-precompile(Tuple{typeof(Base.haskey), Base.Dict{UInt8, Function}, UInt8})
-precompile(Tuple{typeof(Base.getindex), Base.Dict{UInt8, Function}, UInt8})
-precompile(Tuple{typeof(Base.indexed_iterate), Tuple{Nothing, Int64}, Int64, Int64})
-precompile(Tuple{typeof(Base.read), Sockets.TCPSocket, Int64})
-precompile(Tuple{typeof(Base.write), Base.PipeEndpoint, UInt8})
-precompile(Tuple{typeof(Base.fetch), Base.Channel{Any}})
-precompile(Tuple{typeof(Base.iterate), UInt16})
-precompile(Tuple{typeof(Base.something), MQTTClient.TrieNode{MQTTClient.FunctionCallback}, Nothing, Vararg{Any}})
+# precompile(Tuple{typeof(Base.convert), Type{MQTTClient.Packet}, MQTTClient.Packet})
+# precompile(Tuple{typeof(Base.write), Base.PipeEndpoint, Array{UInt8, 1}})
+# precompile(Tuple{typeof(Base.read), Base.PipeEndpoint, Type{UInt8}})
+# precompile(Tuple{typeof(Base.indexed_iterate), Tuple{Nothing, Int64}, Int64})
+# precompile(Tuple{typeof(Base.read), Base.PipeEndpoint, Int64})
+# precompile(Tuple{typeof(Base.haskey), Base.Dict{UInt8, Function}, UInt8})
+# precompile(Tuple{typeof(Base.getindex), Base.Dict{UInt8, Function}, UInt8})
+# precompile(Tuple{typeof(Base.indexed_iterate), Tuple{Nothing, Int64}, Int64, Int64})
+# precompile(Tuple{typeof(Base.read), Sockets.TCPSocket, Int64})
+# precompile(Tuple{typeof(Base.write), Base.PipeEndpoint, UInt8})
+# precompile(Tuple{typeof(Base.fetch), Base.Channel{Any}})
+# precompile(Tuple{typeof(Base.iterate), UInt16})
+# precompile(Tuple{typeof(Base.something), MQTTClient.TrieNode{MQTTClient.FunctionCallback}, Nothing, Vararg{Any}})
 
-precompile(Tuple{typeof(Sockets.connect), MQTTClient.Client, MQTTClient.MQTTConnection{MQTTClient.TCP}})
-precompile(Tuple{typeof(Sockets.connect), Sockets.IPv6, Int64})
-precompile(Tuple{typeof(Sockets.connect), MQTTClient.Client, MQTTClient.MQTTConnection{MQTTClient.UDS}})
-precompile(Tuple{typeof(Sockets.connect), String})
+# precompile(Tuple{typeof(Sockets.connect), MQTTClient.Client, MQTTClient.Connection{MQTTClient.TCP}})
+# precompile(Tuple{typeof(Sockets.connect), Sockets.IPv6, Int64})
+# precompile(Tuple{typeof(Sockets.connect), MQTTClient.Client, MQTTClient.Connection{MQTTClient.UDS}})
+# precompile(Tuple{typeof(Sockets.connect), String})
 
-precompile(Tuple{typeof(MQTTClient.write_len), Sockets.TCPSocket, Int64})
-precompile(Tuple{typeof(MQTTClient.read_len), Sockets.TCPSocket})
-precompile(Tuple{typeof(MQTTClient.write_packet), MQTTClient.Client, UInt8, String, Vararg{Any}})
-precompile(Tuple{typeof(MQTTClient.mqtt_write), Base.GenericIOBuffer{Array{UInt8, 1}}, UInt8})
-precompile(Tuple{typeof(MQTTClient.write_len), Base.PipeEndpoint, Int64})
-precompile(Tuple{typeof(MQTTClient.read_len), Base.PipeEndpoint})
-precompile(Tuple{typeof(MQTTClient.mqtt_write), Base.GenericIOBuffer{Array{UInt8, 1}}, MQTTClient.QOS})
+# precompile(Tuple{typeof(MQTTClient.write_len), Sockets.TCPSocket, Int64})
+# precompile(Tuple{typeof(MQTTClient.read_len), Sockets.TCPSocket})
+# precompile(Tuple{typeof(MQTTClient.write_packet), MQTTClient.Client, UInt8, String, Vararg{Any}})
+# precompile(Tuple{typeof(MQTTClient.mqtt_write), Base.GenericIOBuffer{Array{UInt8, 1}}, UInt8})
+# precompile(Tuple{typeof(MQTTClient.write_len), Base.PipeEndpoint, Int64})
+# precompile(Tuple{typeof(MQTTClient.read_len), Base.PipeEndpoint})
+# precompile(Tuple{typeof(MQTTClient.mqtt_write), Base.GenericIOBuffer{Array{UInt8, 1}}, MQTTClient.QOS})
 
-precompile(Tuple{Type{MQTTClient.Packet}, UInt8, Tuple{}})
-precompile(Tuple{Type{NamedTuple{(:qos,), T} where T<:Tuple}, Tuple{MQTTClient.QOS}})
+# precompile(Tuple{Type{MQTTClient.Packet}, UInt8, Tuple{}})
+# precompile(Tuple{Type{NamedTuple{(:qos,), T} where T<:Tuple}, Tuple{MQTTClient.QOS}})
 
 
 # Precompiling the package like this provides a slower initial load of the package but faster code execution.
@@ -138,6 +138,32 @@ precompile(Tuple{Type{NamedTuple{(:qos,), T} where T<:Tuple}, Tuple{MQTTClient.Q
         @atomicswap c.last_id = 0x0
         future = unsubscribe_async(c, topic)
 
+
+        ## TCP Basic Run
+        server = MQTTClient.MockMQTTBroker(ip"127.0.0.1", 1889)
+        client, conn = MakeConnection(ip"127.0.0.1", 1889)
+
+        connect(client, conn)
+
+        subscribe(client, "foo/bar", cb)
+        publish(client, "bar/foo", qos=QOS_2)
+        unsubscribe(client, "foo/bar")
+
+        disconnect(client)
+        close(server)
+
+        ## UDS Basic Run
+        server = MQTTClient.MockMQTTBroker("/tmp/testmqtt.sock")
+        client, conn = MakeConnection("/tmp/testmqtt.sock")
+
+        connect(client, conn)
+
+        subscribe(client, "foo/bar", cb)
+        publish(client, "bar/foo")
+        unsubscribe(client, "foo/bar")
+
+        disconnect(client)
+        close(server)
     end
 end
 

@@ -15,16 +15,8 @@
                    will::Message=Message(false, 0x00, false, "", UInt8[]),
                    clean_session::Bool=true)::Tuple
 
-    MakeConnection(io::T;
-                   ping_timeout=UInt64(60),
-                   keep_alive::Int64=32,
-                   client_id::String=randstring(8),
-                   user::User=User("", ""),
-                   will::Message=Message(false, 0x00, false, "", UInt8[]),
-                   clean_session::Bool=true)::Tuple where {T <: AbstractIOConnection}
-
 Creates an MQTT client connection to an MQTT broker, handling the construction 
-of both the `Client` and `MQTTConnection` objects. This function provides 
+of both the `Client` and `Connection` objects inside the `Configuration` struct. This function provides 
 flexible ways to specify the connection details either through a TCP connection 
 with host and port, a Unix Domain Socket path.
 
@@ -41,15 +33,14 @@ with host and port, a Unix Domain Socket path.
 - `clean_session::Bool`: Indicates whether to start a clean session (default: true).
 
 # Returns
-- A tuple `(Client, MQTTConnection)` where `Client` is the MQTT client instance 
-  and `MQTTConnection` is the connection information used to connect to the broker.
+- A `Configuration` struct where `client::Client` is the MQTT client instance 
+  and `connection::Connection` is the connection information used to connect to the broker.
 
 This function simplifies the process of setting up an MQTT client connection. 
 Depending on the type of connection, you can specify the broker's IP address 
-and port, a Unix Domain Socket path, or directly provide any struct that is a subtype of `AbstractIOConnection`. 
-It then constructs the necessary `Client` and `MQTTConnection` objects with the 
+and port or a Unix Domain Socket path, it infers the Protocol and then constructs the necessary 
 provided or default parameters. Refer to the documentation for [`Client`](@ref) and 
-[`MQTTConnection`](@ref) for more details on their fields and usage.
+[`Connection`](@ref) object.
 
 ## Examples
 
@@ -59,10 +50,6 @@ client, connection = MakeConnection("127.0.0.1", 1883, client_id="mqtt_client_1"
 
 # Example with Unix Domain Socket path
 client, connection = MakeConnection("/var/run/mqtt.sock", user=User("user", "pass"))
-
-# Example with provided connection
-tcp_conn = TCP(Sockets.localhost, 1883)
-client, connection = MakeConnection(tcp_conn; keep_alive=60, clean_session=false)
 ```
 """
 function MakeConnection(host::Union{IPAddr, String}, port::Int64;
@@ -71,8 +58,8 @@ function MakeConnection(host::Union{IPAddr, String}, port::Int64;
         client_id::String=randstring(8),
         user::User=User("", ""),
         will::Message=Message(false, 0x00, false, "", UInt8[]),
-        clean_session::Bool=true)::Tuple 
-    MakeConnection(IOConnection(host,port),ping_timeout,keep_alive,client_id,user,will,clean_session)
+        clean_session::Bool=true)::Configuration 
+    Configuration(IOConnection(host,port),ping_timeout,keep_alive,client_id,user,will,clean_session)
 end
 function MakeConnection(path::String;
         ping_timeout=UInt64(60),
@@ -80,28 +67,19 @@ function MakeConnection(path::String;
         client_id::String=randstring(8),
         user::User=User("", ""),
         will::Message=Message(false, 0x00, false, "", UInt8[]),
-        clean_session::Bool=true)::Tuple 
-    MakeConnection(IOConnection(path),ping_timeout,keep_alive,client_id,user,will,clean_session)
-end
-function MakeConnection(io::T,
-        ping_timeout=UInt64(60),
-        keep_alive::Int64=32,
-        client_id::String=randstring(8),
-        user::User=User("", ""),
-        will::Message=Message(false, 0x00, false, "", UInt8[]),
-        clean_session::Bool=true)::Tuple where {T <: AbstractIOConnection}
-    (Client(ping_timeout), MQTTConnection(io, keep_alive, client_id, user, will, clean_session))
+        clean_session::Bool=true)::Configuration
+    Configuration(IOConnection(path),ping_timeout,keep_alive,client_id,user,will,clean_session)
 end
 
 
 """
-    connect_async(client::Client, connection::MQTTConnection)
+    connect_async(client::Client, connection::Connection)
 
-Establishes an asynchronous connection to the MQTT broker using the provided `Client` and `MQTTConnection` objects. This function initializes the client, establishes the connection, and starts the necessary loops for communication.
+Establishes an asynchronous connection to the MQTT broker using the provided `Client` and `Connection` objects. This function initializes the client, establishes the connection, and starts the necessary loops for communication.
 
 # Arguments
 - `client::Client`: The MQTT client instance.
-- `connection::MQTTConnection`: The connection information used to connect to the broker.
+- `connection::Connection`: The connection information used to connect to the broker.
 
 # Returns
 - A `Future` object that can be used to await the completion of the connection process.
@@ -117,7 +95,7 @@ wait(future)
 # See Also
 - [`connect`](@ref): The synchronous version of this function.
 """
-function connect_async(client::Client, connection::MQTTConnection)
+function connect_async(client::Client, connection::Connection)
     if !isready(client)
             @atomicswap client.state = 0x00
             client.on_msg = TrieNode()
@@ -188,13 +166,13 @@ end
 
 
 """
-    connect(client::Client, connection::MQTTConnection)
+    connect(client::Client, connection::Connection)
 
-Establishes a synchronous connection to the MQTT broker using the provided [`Client`](@ref) and [`MQTTConnection`](@ref) objects. This function wraps [`connect_async`](@ref) and waits for the connection process to complete.
+Establishes a synchronous connection to the MQTT broker using the provided [`Client`](@ref) and [`Connection`](@ref) objects. This function wraps [`connect_async`](@ref) and waits for the connection process to complete.
 
 # Arguments
 - `client::Client`: The MQTT client instance.
-- `connection::MQTTConnection`: The connection information used to connect to the broker.
+- `connection::Connection`: The connection information used to connect to the broker.
 
 # Returns
 - The result of the connection process after it completes.
@@ -213,9 +191,9 @@ result = connect(client, connection)
 # See Also
 - [`connect_async`](@ref): The asynchronous version of this function.
 - [`Client`](@ref)
-- [`MQTTConnection`](@ref)
+- [`Connection`](@ref)
 """
-connect(client::Client, connection::MQTTConnection) = fetch(connect_async(client, connection))
+connect(client::Client, connection::Connection) = fetch(connect_async(client, connection))
 
 
 """
@@ -305,11 +283,18 @@ Unsubscribes the `Client` instance from the supplied topic names.
 Deletes the callback from the client
 Returns a `Future` object that contains `nothing` on success and an exception on failure. 
 """
+function unsubscribe_async(client::Client, topic::String)
+    future = Future()
+    id = packet_id(client)
+    client.in_flight[id] = future
+    write_packet(client, UNSUBSCRIBE | 0x02, id, topic)
+    remove!(client.on_msg, topic)
+    return future
+end
 function unsubscribe_async(client::Client, topics::String...)
     future = Future()
     id = packet_id(client)
     client.in_flight[id] = future
-    topic_data = []
     write_packet(client, UNSUBSCRIBE | 0x02, id, topics...)
     ((t) -> remove!(client.on_msg, t)).(topics)
     return future
