@@ -19,6 +19,7 @@ include("interface.jl")
 
 export
     MakeConnection,
+    Configuration,
     Client,
     Connection,
     IOConnection,

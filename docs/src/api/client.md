@@ -4,4 +4,5 @@ Connection
 IOConnection
 MQTTClient.Message
 User
+Configuration
 ```
