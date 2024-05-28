@@ -13,6 +13,9 @@ end
 @testset verbose=true "utils tests" begin
     include("unittest.utils.jl")
 end
+@testset verbose=true "topic trie tests" begin
+    include("unittest.topic.jl")
+end
 
 # These tests need a mqtt broker running.
 # A mosquitto configuration file is provided that will allow these tests to be run.

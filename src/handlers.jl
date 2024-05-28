@@ -1,20 +1,4 @@
 
-"""
-    handle_connack(client::Client, s::IO, cmd::UInt8, flags::UInt8)
-
-Handle a `CONNACK` packet.
-
-# Arguments
-- `client::Client`: The client that received the packet.
-- `s::IO`: The socket used for communication.
-- `cmd::UInt8`: The command byte.
-- `flags::UInt8`: The flags byte.
-
-# Examples
-```julia
-julia> handle_connack(client, s, 0x20, 0x00)
-```
-"""
 function handle_connack(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     session_present = read(s, UInt8)
     return_code = read(s, UInt8)
@@ -31,21 +15,7 @@ function handle_connack(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     end
 end
 
-"""
-    handle_publish(client::Client, s::IO, cmd::UInt8, flags::UInt8)
 
-This function handles the publish command in MQTT protocol.
-
-# Arguments
-- `client`: A client object.
-- `s`: An input stream.
-- `cmd`: An unsigned 8-bit integer.
-- `flags`: An unsigned 8-bit integer.
-
-# Returns
-Future.
-
-"""
 function handle_publish(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     dup = (flags & 0x08) >> 3
     qos = (flags & 0x06) >> 1

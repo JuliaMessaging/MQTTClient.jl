@@ -1,10 +1,4 @@
 ```@docs
-MQTTClient.mqtt_channel
-MQTTClient.mqtt_read
-MQTTClient.mqtt_write
-MQTTClient.write_len
-MQTTClient.read_len
 MQTTClient.resolve
-MQTTClient.filter_wildcard_len_check
-MQTTClient.topic_wildcard_len_check
+MQTTClient.topic_eq
 ```

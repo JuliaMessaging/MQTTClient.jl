@@ -1,132 +1,121 @@
 """
     MakeConnection(host::Union{IPAddr, String}, port::Int64;
-        ping_timeout=UInt64(60),
-        keep_alive::Int64=32,
-        client_id::String=randstring(8),
-        user::User=User("", ""),
-        will::Message=Message(false, 0x00, false, "", UInt8[]),
-        clean_session::Bool=true) -> Tuple{Client, MQTTConnection}
+                   ping_timeout=UInt64(60),
+                   keep_alive::Int64=32,
+                   client_id::String=randstring(8),
+                   user::User=User("", ""),
+                   will::Message=Message(false, 0x00, false, "", UInt8[]),
+                   clean_session::Bool=true)::Tuple
 
-Establishes a connection to the given host and port. The host can be either an IP address or a hostname.
-
-# Arguments
-- `host`: The IP address or hostname to connect to.
-- `port`: The port number to connect to.
-- `ping_timeout`: The maximum time in seconds to wait for a ping response before considering the connection lost.
-- `keep_alive`: The maximum time in seconds that the client should wait before sending a ping request to keep the connection alive.
-- `client_id`: The client identifier string.
-- `user`: The user credentials for authentication.
-- `will`: The last will and testament message to be sent by the server on behalf of the client.
-- `clean_session`: Whether to start a clean session or resume a previous one.
-
-# Returns
-A tuple containing a `Client` object and an `MQTTConnection` object.
-"""
-MakeConnection(host::Union{IPAddr, String}, port::Int64;
-        ping_timeout=UInt64(60),
-        keep_alive::Int64=32,
-        client_id::String=randstring(8),
-        user::User=User("", ""),
-        will::Message=Message(false, 0x00, false, "", UInt8[]),
-        clean_session::Bool=true)::Tuple = MakeConnection(IOConnection(host,port),ping_timeout,keep_alive,client_id,user,will,clean_session)
-
-
-"""
     MakeConnection(path::String;
-        ping_timeout=UInt64(60),
-        keep_alive::Int64=32,
-        client_id::String=randstring(8),
-        user::User=User("", ""),
-        will::Message=Message(false, 0x00, false, "", UInt8[]),
-        clean_session::Bool=true)  -> Tuple{Client, MQTTConnection}
+                   ping_timeout=UInt64(60),
+                   keep_alive::Int64=32,
+                   client_id::String=randstring(8),
+                   user::User=User("", ""),
+                   will::Message=Message(false, 0x00, false, "", UInt8[]),
+                   clean_session::Bool=true)::Tuple
 
-Establishes a connection to a Unix domain socket at the given path.
+    MakeConnection(io::T;
+                   ping_timeout=UInt64(60),
+                   keep_alive::Int64=32,
+                   client_id::String=randstring(8),
+                   user::User=User("", ""),
+                   will::Message=Message(false, 0x00, false, "", UInt8[]),
+                   clean_session::Bool=true)::Tuple where {T <: AbstractIOConnection}
 
-# Arguments
-- `path`: The path of the Unix domain socket to connect to.
-- `ping_timeout`: The maximum time in seconds to wait for a ping response before considering the connection lost.
-- `keep_alive`: The maximum time in seconds that the client should wait before sending a ping request to keep the connection alive.
-- `client_id`: The client identifier string.
-- `user`: The user credentials for authentication.
-- `will`: The last will and testament message to be sent by the server on behalf of the client.
-- `clean_session`: Whether to start a clean session or resume a previous one.
-
-# Returns
-A tuple containing a `Client` object and an `MQTTConnection` object.
-"""
-MakeConnection(path::String;
-        ping_timeout=UInt64(60),
-        keep_alive::Int64=32,
-        client_id::String=randstring(8),
-        user::User=User("", ""),
-        will::Message=Message(false, 0x00, false, "", UInt8[]),
-        clean_session::Bool=true)::Tuple = MakeConnection(IOConnection(path),ping_timeout,keep_alive,client_id,user,will,clean_session)
-
-"""
-    MakeConnection(io::T,
-        ping_timeout=UInt64(60),
-        keep_alive::Int64=32,
-        client_id::String=randstring(8),
-        user::User=User("", ""),
-        will::Message=Message(false, 0x00, false, "", UInt8[]),
-        clean_session::Bool=true)  -> Tuple{Client, MQTTConnection}
-
-Establishes an MQTT connection using the given IO connection.
+Creates an MQTT client connection to an MQTT broker, handling the construction 
+of both the `Client` and `MQTTConnection` objects. This function provides 
+flexible ways to specify the connection details either through a TCP connection 
+with host and port, a Unix Domain Socket path.
 
 # Arguments
-- `io`: An IO connection object that implements the `AbstractIOConnection` interface.
-- `ping_timeout`: The maximum time in seconds to wait for a ping response before considering the connection lost.
-- `keep_alive`: The maximum time in seconds that the client should wait before sending a ping request to keep the connection alive.
-- `client_id`: The client identifier string.
-- `user`: The user credentials for authentication.
-- `will`: The last will and testament message to be sent by the server on behalf of the client.
-- `clean_session`: Whether to start a clean session or resume a previous one.
+- `host::Union{IPAddr, String}`: The IP address or hostname of the MQTT broker.
+- `port::Int64`: The port number to connect to.
+- `path::String`: The file system path for Unix Domain Socket connection.
+- `io::T`: An object of subtype `AbstractIOConnection`.
+- `ping_timeout::UInt64`: The ping timeout in seconds (default: 60).
+- `keep_alive::Int64`: The keep-alive time in seconds (default: 32).
+- `client_id::String`: The client identifier (default: a random string of length 8).
+- `user::User`: The user credentials for the MQTT broker (default: anonymous user).
+- `will::Message`: The last will message to be sent in case of unexpected disconnection (default: an empty will message).
+- `clean_session::Bool`: Indicates whether to start a clean session (default: true).
 
 # Returns
-A tuple containing a `Client` object and an `MQTTConnection` object.
+- A tuple `(Client, MQTTConnection)` where `Client` is the MQTT client instance 
+  and `MQTTConnection` is the connection information used to connect to the broker.
+
+This function simplifies the process of setting up an MQTT client connection. 
+Depending on the type of connection, you can specify the broker's IP address 
+and port, a Unix Domain Socket path, or directly provide any struct that is a subtype of `AbstractIOConnection`. 
+It then constructs the necessary `Client` and `MQTTConnection` objects with the 
+provided or default parameters. Refer to the documentation for [`Client`](@ref) and 
+[`MQTTConnection`](@ref) for more details on their fields and usage.
+
+## Examples
+
+```julia
+# Example with IP address and port
+client, connection = MakeConnection("127.0.0.1", 1883, client_id="mqtt_client_1")
+
+# Example with Unix Domain Socket path
+client, connection = MakeConnection("/var/run/mqtt.sock", user=User("user", "pass"))
+
+# Example with provided connection
+tcp_conn = TCP(Sockets.localhost, 1883)
+client, connection = MakeConnection(tcp_conn; keep_alive=60, clean_session=false)
+```
 """
-function MakeConnection(io::T,
-    ping_timeout=UInt64(60),
-    keep_alive::Int64=32,
-    client_id::String=randstring(8),
-    user::User=User("", ""),
-    will::Message=Message(false, 0x00, false, "", UInt8[]),
-    clean_session::Bool=true)::Tuple where T <: AbstractIOConnection
-    return (Client(ping_timeout), MQTTConnection(io, keep_alive, client_id, user, will, clean_session))
+function MakeConnection(host::Union{IPAddr, String}, port::Int64;
+        ping_timeout=UInt64(60),
+        keep_alive::Int64=32,
+        client_id::String=randstring(8),
+        user::User=User("", ""),
+        will::Message=Message(false, 0x00, false, "", UInt8[]),
+        clean_session::Bool=true)::Tuple 
+    MakeConnection(IOConnection(host,port),ping_timeout,keep_alive,client_id,user,will,clean_session)
 end
-# NOTE: comment out for now
-# TODO: add Type to Client struct at some point.
-# function MakeConnection(io::TCP,
-#         ping_timeout=UInt64(60),
-#         keep_alive::Int64=32,
-#         client_id::String=randstring(8),
-#         user::User=User("", ""),
-#         will::Message=Message(false, 0x00, false, "", UInt8[]),
-#         clean_session::Bool=true)::Tuple{Client, MQTTConnection}
-#     return (Client{TCPSocket}(ping_timeout), MQTTConnection(io, keep_alive, client_id, user, will, clean_session))
-# end
-# function MakeConnection(io::UDS,
-#         ping_timeout=UInt64(60),
-#         keep_alive::Int64=32,
-#         client_id::String=randstring(8),
-#         user::User=User("", ""),
-#         will::Message=Message(false, 0x00, false, "", UInt8[]),
-#         clean_session::Bool=true)::Tuple{Client, MQTTConnection}
-#     return (Client{PipeEndpoint}(ping_timeout), MQTTConnection(io, keep_alive, client_id, user, will, clean_session))
-# end
-
+function MakeConnection(path::String;
+        ping_timeout=UInt64(60),
+        keep_alive::Int64=32,
+        client_id::String=randstring(8),
+        user::User=User("", ""),
+        will::Message=Message(false, 0x00, false, "", UInt8[]),
+        clean_session::Bool=true)::Tuple 
+    MakeConnection(IOConnection(path),ping_timeout,keep_alive,client_id,user,will,clean_session)
+end
+function MakeConnection(io::T,
+        ping_timeout=UInt64(60),
+        keep_alive::Int64=32,
+        client_id::String=randstring(8),
+        user::User=User("", ""),
+        will::Message=Message(false, 0x00, false, "", UInt8[]),
+        clean_session::Bool=true)::Tuple where {T <: AbstractIOConnection}
+    (Client(ping_timeout), MQTTConnection(io, keep_alive, client_id, user, will, clean_session))
+end
 
 
 """
     connect_async(client::Client, connection::MQTTConnection)
 
-Establishes an asynchronous connection to an MQTT broker using the specified `client` and `connection` objects.
+Establishes an asynchronous connection to the MQTT broker using the provided `Client` and `MQTTConnection` objects. This function initializes the client, establishes the connection, and starts the necessary loops for communication.
 
-The function sets up the write and read loops, as well as the keep-alive loop if the keep-alive time is greater than 0. It also sets the protocol name and level, and the connect flags.
+# Arguments
+- `client::Client`: The MQTT client instance.
+- `connection::MQTTConnection`: The connection information used to connect to the broker.
 
-If the user name and password are provided in the `connection` object, they are included in the connect flags. If a will topic is provided, it is also included in the connect flags.
+# Returns
+- A `Future` object that can be used to await the completion of the connection process.
 
-The function returns a `Future` object that can be used to track the progress of the connection.
+## Example
+
+```julia
+client, connection = MakeConnection("127.0.0.1", 1883, client_id="mqtt_client_1")
+future = connect_async(client, connection)
+wait(future)
+```
+
+# See Also
+- [`connect`](@ref): The synchronous version of this function.
 """
 function connect_async(client::Client, connection::MQTTConnection)
     if !isready(client)
@@ -201,9 +190,30 @@ end
 """
     connect(client::Client, connection::MQTTConnection)
 
-Establishes a synchronous connection to an MQTT broker using the specified `client` and `connection` objects.
+Establishes a synchronous connection to the MQTT broker using the provided [`Client`](@ref) and [`MQTTConnection`](@ref) objects. This function wraps [`connect_async`](@ref) and waits for the connection process to complete.
 
-This function is a wrapper around the `connect_async` function, which establishes an asynchronous connection. The `connect` function blocks until the connection is established by calling the `resolve` function on the `Future` object returned by `connect_async`.
+# Arguments
+- `client::Client`: The MQTT client instance.
+- `connection::MQTTConnection`: The connection information used to connect to the broker.
+
+# Returns
+- The result of the connection process after it completes.
+
+The connect function is responsible for establishing a connection between an MQTT client and an MQTT broker. It initializes the client's state, sets up the necessary communication channels, and handles the connection handshake according to the MQTT protocol. When called, connect first ensures that the client's state and resources are properly initialized. This includes resetting the client's state, setting up the socket connection, and creating the channels and locks required for communication. The function then starts the asynchronous tasks needed to manage the read, write, and keep-alive loops, which are crucial for maintaining the connection and ensuring that messages are sent and received properly.
+
+Additionally, the connect function handles the specifics of the MQTT protocol handshake. It constructs and sends the CONNECT packet, including details such as the client ID, user credentials, and optional will message. This handshake process ensures that the broker recognizes the client and sets up the session according to the specified parameters. The synchronous connect function blocks until the connection process is complete, providing a straightforward way to establish the connection without needing to manage asynchronous operations directly. This makes it suitable for applications that require a simple, blocking call to connect to the broker and start communicating immediately.
+
+## Example
+
+```julia
+client, connection = MakeConnection("127.0.0.1", 1883, client_id="mqtt_client_1")
+result = connect(client, connection)
+```
+
+# See Also
+- [`connect_async`](@ref): The asynchronous version of this function.
+- [`Client`](@ref)
+- [`MQTTConnection`](@ref)
 """
 connect(client::Client, connection::MQTTConnection) = fetch(connect_async(client, connection))
 

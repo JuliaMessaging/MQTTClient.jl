@@ -1,9 +1,12 @@
 """
     Client
 
-A mutable struct representing an MQTT client.
-
-An MQTT client is any device (from a microcontroller up to a fully-fledged server) that runs an MQTT library and connects to an MQTT broker over a network. Information is organized in a hierarchy of topics.
+The MQTT client in Julia facilitates communication between a device and an MQTT broker over a network. 
+It manages connections, message handling, and maintains the state of communication. 
+The client operates through three main loops: the read loop listens for incoming messages from the broker and processes them using designated handlers; 
+the write loop sends packets to the broker from a queue, ensuring thread safety with a socket lock; 
+and the keep-alive loop periodically sends ping requests to the broker to maintain the connection and detect disconnections. 
+This client uses atomic operations to ensure thread safety for shared variables and supports asynchronous task management for efficient, non-blocking operations.
 
 # Fields
 - `state::UInt8`: client state.
@@ -67,19 +70,6 @@ mutable struct Client
 end
 
 
-
-"""
-    write_loop(client)
-
-This function writes data to the socket.
-
-# Arguments
-- `client`: A client object.
-
-# Returns
-Nothing.
-
-"""
 function write_loop(client::Client)::UInt8
     try
         while !isclosed(client)
@@ -125,19 +115,7 @@ function write_loop(client::Client)::UInt8
     end
 end
 
-"""
-    read_loop(client)
 
-Reads data from a client socket and processes it.
-
-# Arguments
-- `client`: A client object.
-
-# Example
-```julia
-read_loop(client)
-```
-"""
 function read_loop(client::Client)::UInt8
     try
         while !isclosed(client)
@@ -179,11 +157,7 @@ function read_loop(client::Client)::UInt8
     end
 end
 
-"""
-    keep_alive_loop(client::Client)
 
-This function runs a loop that sends a PINGREQ message to the MQTT broker to keep the connection alive. The loop checks the connection at regular intervals determined by the `client.keep_alive` value. If no message has been sent or received within the keep-alive interval, a PINGREQ message is sent. If no PINGRESP message is received within the `client.ping_timeout` interval, the client is disconnected.
-"""
 function keep_alive_loop(client::Client)::UInt8
     ping_sent = time()
 

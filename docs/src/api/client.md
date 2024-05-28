@@ -2,16 +2,6 @@
 Client
 MQTTConnection
 IOConnection
-MQTTClient.TCP
-MQTTClient.UDS
-MQTTException
-MQTTClient.AbstractIOConnection
-MQTTClient.Packet
 MQTTClient.Message
 User
-MQTTClient.write_loop
-MQTTClient.read_loop
-MQTTClient.keep_alive_loop
-MQTTClient.packet_id
-MQTTClient.write_packet
 ```
