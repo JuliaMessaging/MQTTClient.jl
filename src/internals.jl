@@ -40,11 +40,6 @@ const CLIENT_STATE = Dict{UInt8, Symbol}(
                                         )
 ## Types
 
-"""
-    AbstractIOConnection
-
-    Base Connection Protocol type
-"""
 abstract type AbstractIOConnection end
 
 AbstractProtocol = Union{PipeEndpoint, TCPSocket}
@@ -60,34 +55,12 @@ AbstractProtocol = Union{PipeEndpoint, TCPSocket}
 ## Structs
 ## -------
 
-"""
-    struct MQTTException <: Exception
-        msg::AbstractString
-    end
 
-    A custom exception type for MQTT errors.
-
-    # Examples
-    ```julia
-    julia> throw(MQTTException(\"Connection refused: Not authorized\"))
-    MQTTException(\"Connection refused: Not authorized\")
-    ```
-"""
 struct MQTTException <: Exception
     msg::AbstractString
 end
 
-"""
-    Packet
 
-A composite type representing a packet.
-
-# Fields
-
-- `cmd::UInt8`: an 8-bit unsigned integer representing the command.
-- `data::Any`: any value representing the data.
-
-"""
 struct Packet
     cmd::UInt8
     data::Any
@@ -151,7 +124,8 @@ A struct that represents a user with a name and password.
 
 # Examples
 ```julia
-julia> user = User("John", "password")
+user = User("John", "password")
+
 User("John", "password")
 ```
 """

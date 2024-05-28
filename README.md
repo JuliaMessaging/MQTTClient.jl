@@ -8,6 +8,8 @@
 [![Code Style: Blue](https://img.shields.io/badge/code%20style-blue-4495d1.svg)](https://github.com/invenia/BlueStyle)
 
 MQTT Client Library for Julia
+ 
+#### Important! Version `0.3.0` or higher requires at least Julia `v1.8`
 
 This library provides a MQTT Client and functions for interfacing with a standard MQTT broker. This includes publishing messages, and subscribing to topics to receive published messages. See the [documentation](https://JuliaMessaging.github.io/MQTTClient.jl) for more information.
 
@@ -40,7 +42,7 @@ This work is based on the MQTT.jl packages created by [femtomic](https://github.
     * separate handle_pubrecrel into two different methods and fix them
 - [ ] review connect method
     * make it not hardcoded
-- [ ] disconnect_async/disconnect
+- [x] disconnect_async/disconnect
     * think about what we need to do and how
     * the reconnect should still work
 - [ ] implement clean session = false

@@ -1,7 +1,7 @@
 name = "MQTTClient"
 uuid = "985f35cc-2c3d-4943-b8c1-f0931d5f0959"
 authors = ["Nick Shindler <nick@shindler.tech>"]
-version = "0.2.1"
+version = "0.3.0"
 
 [deps]
 Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"

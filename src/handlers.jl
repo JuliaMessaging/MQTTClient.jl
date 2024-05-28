@@ -1,20 +1,4 @@
 
-"""
-    handle_connack(client::Client, s::IO, cmd::UInt8, flags::UInt8)
-
-Handle a `CONNACK` packet.
-
-# Arguments
-- `client::Client`: The client that received the packet.
-- `s::IO`: The socket used for communication.
-- `cmd::UInt8`: The command byte.
-- `flags::UInt8`: The flags byte.
-
-# Examples
-```julia
-julia> handle_connack(client, s, 0x20, 0x00)
-```
-"""
 function handle_connack(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     session_present = read(s, UInt8)
     return_code = read(s, UInt8)
@@ -31,21 +15,7 @@ function handle_connack(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     end
 end
 
-"""
-    handle_publish(client::Client, s::IO, cmd::UInt8, flags::UInt8)
 
-This function handles the publish command in MQTT protocol.
-
-# Arguments
-- `client`: A client object.
-- `s`: An input stream.
-- `cmd`: An unsigned 8-bit integer.
-- `flags`: An unsigned 8-bit integer.
-
-# Returns
-Future.
-
-"""
 function handle_publish(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     dup = (flags & 0x08) >> 3
     qos = (flags & 0x06) >> 1
@@ -63,20 +33,14 @@ function handle_publish(client::Client, s::IO, cmd::UInt8, flags::UInt8)
         write_packet(client, PUBREC, id)
     end
 
-    payload = take!(s)
-    if haskey(client.on_msg, topic)
-        @async client.on_msg[topic](topic,payload)
-    else
-        try
-            options = Vector{String}(collect(keys(client.on_msg)))
-            matches = findall(t -> topic_eq(t, topic), options)
-            for topic_match in options[matches]
-                @async client.on_msg[topic_match](topic,payload)
-            end
-        catch e
-            @error e
-            @atomicswap client.state = 0x03
-        end
+    try
+        payload = take!(s)
+        get(client.on_msg, topic, DefaultCB)(topic, payload)
+    catch e
+        # @error e
+        # @error stacktrace(catch_backtrace())
+        @atomicswap client.state = 0x03
+        rethrow()
     end
 end
 
@@ -106,15 +70,22 @@ end
 function handle_suback(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     id = mqtt_read(s, UInt16)
     return_codes = take!(s)
-    put!(client.in_flight[id], return_codes)
+    if haskey(client.in_flight, id)
+        put!(client.in_flight[id], return_codes)
+    else
+        # TODO unexpected inflight message ack
+        @atomicswap client.state = 0x03
+    end
 end
 
 function handle_pingresp(client::Client, s::IO, cmd::UInt8, flags::UInt8)
-    if client.ping_outstanding[] == 0x1
-        atomic_xchg!(client.ping_outstanding, 0x0)
+    if @atomic(client.ping_outstanding) == 0x1
+        @atomicswap client.ping_outstanding = 0x0
     else
         # We received a subresp packet we didn't ask for
-        disconnect(client)
+        # disconnect(client)
+        @atomicswap client.state = 0x03
+        throw(ArgumentError("No outstanding ping. client.ping_outstanding = $(client.ping_outstanding) and should be 0x1"))
     end
 end
 

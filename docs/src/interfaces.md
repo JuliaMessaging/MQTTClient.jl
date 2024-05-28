@@ -6,29 +6,22 @@ Connects the `Client` instance to the specified broker. There is a synchronous a
 #### Arguments
 **Required arguments:**
 * **client**::Client: The client to connect to the broker.
-* **host**::AbstractString: The hostname or ip address of the broker.
+* **connection**::MQTTConnection: The information for how the client connects to the broker.
 
-**Optional arguments:**
-* **port**::Integer: The port to use ; *default = 1883*
-* **keep_alive**::Int64: If the client hasn't sent or received a message within this time limit, it will ping the broker to verify the connection is still active. A value of 0 means no pings will be sent. ; *default = 0*
-* **client_id**::String: The id of the client. This should be unique per broker. Some brokers allow an empty client_id for a stateless connection (this means clean_session needs to be true). ; *default = random 8 char string*
-* **user**::User: The user, password pair for authentication with the broker. Password can be empty even if user isn't. The password should probably be encrypted. ; *default = empty pair*  
-* **will**::Message: The will of this client. This message gets published on the specified topic once the client disconnects from the broker. The type of this argument is `Message`, consult with it's documentation above for more info. ; *default = empty will*
-* **clean_session**::Bool: Specifies whether or not a connection should be resumed. This implies this `Client` instance was previously connected to this broker. ; *default = true*
+use `MakeConnection` to get the client and the connection objects. 
 
 #### Call example
-The dup and retain flag of a will have to be false so it's safest to use the minimal `Message` constructor (Refer to `Message` documentation above).
 
 ```julia
 connect(client, connection)
 ```
 
 #### Synchronous connect
-This method waits until the client is connected to the broker. TODO add return documentation
+This method waits until the client is connected to the broker.
 
 
 #### Asynchronous connect
-This method doesn't wait and returns a `Future` object. You may wait on this object with the fetch method. This future completes once the client is fully connected. TODO add future data documentation
+This method doesn't wait and returns a `Future` object. You may wait on this object with the fetch method. This future completes once the client is fully connected.
 
 ## Publish
 [MQTT v3.1.1 Doc](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718037)
@@ -49,27 +42,27 @@ Publishes a message to the broker connected to the `Client` instance provided as
 #### Call example
 These are valid `payload...` examples.
 ```julia
-publish(c, "hello/world")
-publish(c, "hello/world", "Test", 6, 4.2)
+publish(client, "hello" "world")
+publish(client, "foo/bar", "hello world")
 ```
 
 This is a valid use of the optional arguments.
 ```julia
-publish(c, "hello/world", "Test", 6, 4.2, qos=QOS_1, retain=true)
+publish(client, "foo/bar", "hello world", qos=QOS_1, retain=true)
 ```
 
 #### Synchronous publish
-This method waits until the publish message has been processed completely and successfully. So in case of QOS 2 it waits until the PUBCOMP has been received. TODO add return documentation
+This method waits until the publish message has been processed completely and successfully. So in case of QOS 2 it waits until the PUBCOMP has been received.
 
 
 #### Asynchronous publish
-This method doesn't wait and returns a `Future` object. You may choose to wait on this object. This future completes once the publish message has been processed completely and successfully. So in case of QOS 2 it waits until the PUBCOMP has been received. TODO change future data documentation
+This method doesn't wait and returns a `Future` object. You may choose to wait on this object. This future completes once the publish message has been processed completely and successfully. So in case of QOS 2 it waits until the PUBCOMP has been received.
 
 
 ## Subscribe
 [MQTT v3.1.1 Doc](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718063)
 
-Subscribes the `Client` instance, provided as a parameter, to the specified topics. There is a synchronous and an asynchronous version available. Both versions take the same arguments.
+Subscribes the `Client` instance, provided as a parameter, to the specified topics. There is a synchronous and an asynchronous version available. Both versions take the same arguments. 
 
 #### Arguments
 **Required arguments:**
@@ -79,26 +72,40 @@ Subscribes the `Client` instance, provided as a parameter, to the specified topi
 * **qos**::QOS: the named argument to set the QOS, defaults to QOS_0.
 
 #### Call example
-This example subscribes to the topic "test" with QOS_2 and "test2" with QOS_0.
+This example subscribes to the topic "test" with QOS_2.
 ```julia
-subscribe(c, "test", ((t,p)->do_a_thing(p)), qos=QOS_2))
+cb(topic, payload) = println("[$topic] $(String(payload))")
+subscribe(client, "test", cb, qos=QOS_2))
+```
+
+While a lambda function can be used, it can help to define the callback function.
+```julia
+cb(topic, payload) = println("[$topic] $(String(payload))")
+subscribe(client, "foo/bar", cb, qos=QOS_2)
+subscribe(client, "foo/baz", ((args...) -> nothing), qos=QOS_2)
+```
+
+```bash
+julia> client.on_msg
+foo/bar: cb
+foo/baz: #15
 ```
 
 #### Synchronous subscribe
-This method waits until the subscribe message has been successfully sent and acknowledged. TODO add return documentation
+This method waits until the subscribe message has been successfully sent and acknowledged.
 
 ```julia
 subscribe(c, "test", on_msg, qos=QOS_2))
 ```
 
 #### Asynchronous subscribe
-This method doesn't wait and returns a `Future` object. You may choose to wait on this object. This future completes once the subscribe message has been successfully sent and acknowledged. TODO change future data documentation
+This method doesn't wait and returns a `Future` object. You may choose to wait on this object. This future completes once the subscribe message has been successfully sent and acknowledged.
 
 
 ## Unsubscribe
 [MQTT v3.1.1 Doc](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718072)
 
-This method unsubscribes the `Client` instance from the specified topics. There is a synchronous and an asynchronous version available. Both versions take the same arguments.
+This method unsubscribes the Client from the specified topics. There is a synchronous and an asynchronous version available. Both versions take the same arguments.
 
 #### Arguments
 **Required arguments:**
@@ -107,15 +114,15 @@ This method unsubscribes the `Client` instance from the specified topics. There 
 
 #### Example call
 ```julia
-unsubscribe(c, "test1", "test2", "test3")
+unsubscribe(client, "test")
 ```
 
 #### Synchronous unsubscribe
-This method waits until the unsubscribe method has been sent and acknowledged. TODO add return documentation
+This method waits until the unsubscribe method has been sent and acknowledged.
 
 
 #### Asynchronous unsubscribe
-This method doesn't wait and returns a `Future` object. You may wait on this object with the fetch method. This future completes once the unsubscribe message has been sent and acknowledged. TODO add future data documentation
+This method doesn't wait and returns a `Future` object. You may wait on this object with the fetch method. This future completes once the unsubscribe message has been sent and acknowledged.
 
 ## Disconnect
 [MQTT v3.1.1 Doc](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718090)
@@ -128,5 +135,5 @@ Disconnects the `Client` instance gracefully, shuts down the background tasks an
 
 #### Example call
 ```julia
-disconnect(c)
+disconnect(client)
 ```
