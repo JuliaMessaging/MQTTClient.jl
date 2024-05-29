@@ -9,7 +9,7 @@ cb(args...) = nothing
 
     res = subscribe(client, "foo/bar", cb)
     @test res == [0x01, 0x00]
-    res = publish(client, "bar/foo", "baz" qos=QOS_2)
+    res = publish(client, "bar/foo", "baz"; qos=QOS_2)
     @test isnothing(res)
     res = unsubscribe(client, "foo/bar")
     @test isnothing(res)
