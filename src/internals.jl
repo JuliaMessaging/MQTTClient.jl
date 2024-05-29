@@ -25,41 +25,34 @@ const CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD = 0x04
 const CONNECTION_REFUSED_NOT_AUTHORIZED = 0x05
 
 # error consts
-const CONNACK_ERRORS = Dict{UInt8, String}(
-                                           0x01 => "connection refused unacceptable protocol version",
-                                           0x02 => "connection refused identifier rejected",
-                                           0x03 => "connection refused server unavailable",
-                                           0x04 => "connection refused bad user name or password",
-                                           0x05 => "connection refused not authorized",
-                                          )
+const CONNACK_ERRORS = Dict{UInt8,String}(
+    0x01 => "connection refused unacceptable protocol version",
+    0x02 => "connection refused identifier rejected",
+    0x03 => "connection refused server unavailable",
+    0x04 => "connection refused bad user name or password",
+    0x05 => "connection refused not authorized",
+)
 
-const CLIENT_STATE = Dict{UInt8, Symbol}(
-                                        0x00 => :ready,
-                                        0x01 => :connected,
-                                        0x02 => :closed,
-                                        )
+const CLIENT_STATE = Dict{UInt8,Symbol}(0x00 => :ready, 0x01 => :connected, 0x02 => :closed)
 ## Types
 
 abstract type AbstractIOConnection end
 
-AbstractProtocol = Union{PipeEndpoint, TCPSocket}
+abstract type AbstractConfigElement end
+
+AbstractProtocol = Union{PipeEndpoint,TCPSocket}
 
 ## Enums
 ## -----
 # QOS values
-@enum(QOS::UInt8,
-      QOS_0 = 0x00,
-      QOS_1 = 0x01,
-      QOS_2 = 0x02)
+@enum(QOS::UInt8, QOS_0 = 0x00, QOS_1 = 0x01, QOS_2 = 0x02)
 
 ## Structs
 ## -------
 
-
 struct MQTTException <: Exception
     msg::AbstractString
 end
-
 
 struct Packet
     cmd::UInt8
@@ -68,7 +61,6 @@ end
 
 Base.:(==)(p1::Packet, p2::Packet) = p1.cmd == p2.cmd && p1.data == p2.data
 
-
 """
     Message
 
@@ -76,18 +68,17 @@ A composite type representing a message.
 
 # Fields
 
-- `dup::Bool`: a boolean indicating whether the message is a duplicate.
-- `qos::UInt8`: an 8-bit unsigned integer representing the quality of service.
-- `retain::Bool`: a boolean indicating whether the message should be retained.
-- `topic::String`: a string representing the topic.
-- `payload::Array{UInt8}`: an array of 8-bit unsigned integers representing the payload.
+  - `dup::Bool`: a boolean indicating whether the message is a duplicate.
+  - `qos::UInt8`: an 8-bit unsigned integer representing the quality of service.
+  - `retain::Bool`: a boolean indicating whether the message should be retained.
+  - `topic::String`: a string representing the topic.
+  - `payload::Array{UInt8}`: an array of 8-bit unsigned integers representing the payload.
 
 # Constructors
 
-- `Message(qos::QOS, topic::String, payload...)`: constructs a new message with default values for `dup` and `retain`.
-- `Message(dup::Bool, qos::QOS, retain::Bool, topic::String, payload...)`: constructs a new message with all fields specified.
-- `Message(dup::Bool, qos::UInt8, retain::Bool, topic::String, payload...)`: constructs a new message with all fields specified.
-
+  - `Message(qos::QOS, topic::String, payload...)`: constructs a new message with default values for `dup` and `retain`.
+  - `Message(dup::Bool, qos::QOS, retain::Bool, topic::String, payload...)`: constructs a new message with all fields specified.
+  - `Message(dup::Bool, qos::UInt8, retain::Bool, topic::String, payload...)`: constructs a new message with all fields specified.
 """
 struct Message
     dup::Bool
@@ -115,7 +106,13 @@ struct Message
     end
 end
 
-Base.:(==)(m1::Message, m2::Message) = m1.dup == m2.dup && m1.qos == m2.qos && m1.retain == m2.retain && m1.topic == m2.topic && m1.payload == m2.payload
+function Base.:(==)(m1::Message, m2::Message)
+    return m1.dup == m2.dup &&
+           m1.qos == m2.qos &&
+           m1.retain == m2.retain &&
+           m1.topic == m2.topic &&
+           m1.payload == m2.payload
+end
 
 """
     User(name::String, password::String)
@@ -123,6 +120,7 @@ Base.:(==)(m1::Message, m2::Message) = m1.dup == m2.dup && m1.qos == m2.qos && m
 A struct that represents a user with a name and password.
 
 # Examples
+
 ```julia
 user = User("John", "password")
 

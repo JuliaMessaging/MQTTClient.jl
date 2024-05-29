@@ -1,7 +1,7 @@
 name = "MQTTClient"
 uuid = "985f35cc-2c3d-4943-b8c1-f0931d5f0959"
 authors = ["Nick Shindler <nick@shindler.tech>"]
-version = "0.3.0"
+version = "0.3.1"
 
 [deps]
 Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
@@ -15,7 +15,7 @@ PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
 PrecompileMQTT = "PrecompileTools"
 
 [compat]
-julia = "1.7"
+julia = "1.8"
 
 [extras]
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"

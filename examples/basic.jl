@@ -6,22 +6,22 @@ payload = "Hello World!"
 
 # Define the callback for receiving messages.
 function on_msg(topic, payload)
-    println("Received message topic: [", topic, "] payload: [", String(payload), "]")
+    return println("Received message topic: [", topic, "] payload: [", String(payload), "]")
 end
 
 # Instantiate a client.
-client, connection = MakeConnection(broker,1883)
+client, connection = MakeConnection(broker, 1883)
 
 connect(client, connection)
 println("connected to $client at $(connection.protocol)")
 
 # Subscribe to the topic.
-subscribe(client, topic, on_msg, qos=QOS_2)
+subscribe(client, topic, on_msg; qos=QOS_2)
 println("subscribed to $topic")
 
 sleep(0.5)
 
-publish(client, topic, payload, qos=QOS_2)
+publish(client, topic, payload; qos=QOS_2)
 println("published $payload to $topic")
 
 # Unsubscribe from the topic

@@ -2,7 +2,7 @@ abstract type AbstractNodeCallback end
 
 function DefaultCB(topic, payload)
     @debug "Recieved data on $topic without callback specified" payload
-    nothing
+    return nothing
 end
 
 struct EmptyCallback <: AbstractNodeCallback end
@@ -17,10 +17,12 @@ struct TrieNode{F<:AbstractNodeCallback}
     TrieNode() = new{EmptyCallback}(Dict{String,TrieNode}(), EmptyCallback())
     TrieNode(child::Dict{String,TrieNode}) = new{EmptyCallback}(child, EmptyCallback())
 
-    TrieNode(cb::Function) =
-        new{FunctionCallback}(Dict{String,TrieNode}(), FunctionCallback(cb))
-    TrieNode(child::Dict{String,TrieNode}, cb::Function) =
-        new{FunctionCallback}(child, FunctionCallback(cb))
+    function TrieNode(cb::Function)
+        return new{FunctionCallback}(Dict{String,TrieNode}(), FunctionCallback(cb))
+    end
+    function TrieNode(child::Dict{String,TrieNode}, cb::Function)
+        return new{FunctionCallback}(child, FunctionCallback(cb))
+    end
 
     TrieNode(::Nothing, cb::Function) = TrieNode(cb)
     TrieNode(childnode::TrieNode, cb::Function) = TrieNode(childnode.children, cb)
@@ -29,8 +31,9 @@ struct TrieNode{F<:AbstractNodeCallback}
     TrieNode(cb::FunctionCallback) = TrieNode(cb.eval)
 end
 
-(node::TrieNode{FunctionCallback})(topic, payload) =
-    Base.invokelatest(node.cb.eval, topic, payload)
+function (node::TrieNode{FunctionCallback})(topic, payload)
+    return Base.invokelatest(node.cb.eval, topic, payload)
+end
 (node::TrieNode{EmptyCallback})(topic, payload) = DefaultCB(topic, payload)
 
 function Base.get(root::TrieNode, topic::String, default::Function)
@@ -44,23 +47,19 @@ trie_lookup(node::Nothing, part::Any, topic_parts::Any) = nothing
 
 function trie_lookup(node::TrieNode, part::AbstractString, topic_parts::Vector)
     topic = trie_lookup(
-        get(node.children, part, nothing),
-        get(topic_parts, 1, nothing),
-        topic_parts[2:end],
+        get(node.children, part, nothing), get(topic_parts, 1, nothing), topic_parts[2:end]
     )
     wildcard = trie_lookup(
-        get(node.children, "+", nothing),
-        get(topic_parts, 1, nothing),
-        topic_parts[2:end],
+        get(node.children, "+", nothing), get(topic_parts, 1, nothing), topic_parts[2:end]
     )
     multi = get(node.children, "#", nothing)
 
-    something(topic, wildcard, multi, Some(nothing))
+    return something(topic, wildcard, multi, Some(nothing))
 end
 
 function Base.insert!(root::TrieNode, key::String, fn::Function)
     depth = count(==('/'), key) + 1
-    key_parts = eachsplit(key, '/', keepempty = true)
+    key_parts = eachsplit(key, '/'; keepempty=true)
     node = root
     for (idx, part) in enumerate(key_parts)
         if idx === depth
@@ -80,7 +79,7 @@ end
 function remove!(root::TrieNode, topic::String)
     parts = split(topic, '/')
     remove_node!(root, get(parts, 1, nothing), parts[2:end])
-    nothing
+    return nothing
 end
 
 function remove_node!(node::TrieNode, part, parts::Vector)
@@ -94,13 +93,15 @@ function remove_node!(node::TrieNode, part, parts::Vector)
     elseif part == "+"
         return all([
             (
-                (
+                if (
                     remove_node!(
-                        get(node.children, k, nothing),
-                        get(parts, 1, nothing),
-                        parts[2:end],
+                        get(node.children, k, nothing), get(parts, 1, nothing), parts[2:end]
                     ) && isempty(node.children[k].children)
-                ) ? (delete!(node.children, k); true) : false
+                )
+                    (delete!(node.children, k); true)
+                else
+                    false
+                end
             ) for k in keys(node.children)
         ])
     elseif isnothing(child_node)
@@ -116,9 +117,7 @@ function remove_node!(node::TrieNode, part, parts::Vector)
     else
         # branch, go to next
         if remove_node!(
-            get(node.children, part, nothing),
-            get(parts, 1, nothing),
-            parts[2:end],
+            get(node.children, part, nothing), get(parts, 1, nothing), parts[2:end]
         ) && isempty(child_node.children)
             delete!(node.children, part)
             return true
@@ -128,14 +127,18 @@ function remove_node!(node::TrieNode, part, parts::Vector)
 end
 remove_node!(node::Nothing, part, parts::Vector) = false
 
-
-prune!(node::TrieNode) =
+function prune!(node::TrieNode)
     while !isempty(node.children) &&
-          any([prune!(node, key, childnode) for (key, childnode) in node.children])
+        any([prune!(node, key, childnode) for (key, childnode) in node.children])
     end
-prune!(node::TrieNode, key, childnode::TrieNode{MQTTClient.FunctionCallback}) =
-    !isempty(childnode.children) ?
-    any([prune!(childnode, k, n) for (k, n) in childnode.children]) : false
+end
+function prune!(node::TrieNode, key, childnode::TrieNode{MQTTClient.FunctionCallback})
+    return if !isempty(childnode.children)
+        any([prune!(childnode, k, n) for (k, n) in childnode.children])
+    else
+        false
+    end
+end
 
 function prune!(node::TrieNode, key, childnode::TrieNode{MQTTClient.EmptyCallback})
     if isempty(childnode.children)
@@ -145,30 +148,45 @@ function prune!(node::TrieNode, key, childnode::TrieNode{MQTTClient.EmptyCallbac
     return any([prune!(childnode, k, n) for (k, n) in childnode.children])
 end
 
-explode(node::TrieNode{EmptyCallback}; path = []) =
-    isempty(node.children) ? (path, nothing) :
-    [explode(node.children[k], path = [path..., k]) for k in keys(node.children)]
-explode(node::TrieNode{FunctionCallback}; path = []) =
-    isempty(node.children) ? (path, node.cb) :
-    (
-        path,
-        node.cb,
-        [explode(node.children[k], path = [path..., k]) for k in keys(node.children)],
-    )
+function explode(node::TrieNode{EmptyCallback}; path=[])
+    return if isempty(node.children)
+        (path, nothing)
+    else
+        [explode(node.children[k]; path=[path..., k]) for k in keys(node.children)]
+    end
+end
+function explode(node::TrieNode{FunctionCallback}; path=[])
+    return if isempty(node.children)
+        (path, node.cb)
+    else
+        (
+            path,
+            node.cb,
+            [explode(node.children[k]; path=[path..., k]) for k in keys(node.children)],
+        )
+    end
+end
 
 show_exploded(vec::Vector) = join(show_exploded.(vec), "\n")
-show_exploded((vec, cb)::Tuple{Vector{String},FunctionCallback}) =
-    "$(join(vec, "/")): $(cb.eval)"
-show_exploded((vec, cb, child)::Tuple{Vector{String},FunctionCallback,Vector}) =
-    "$(join(vec, "/")): $(cb.eval)\n$(show_exploded(child))"
+function show_exploded((vec, cb)::Tuple{Vector{String},FunctionCallback})
+    return "$(join(vec, "/")): $(cb.eval)"
+end
+function show_exploded((vec, cb, child)::Tuple{Vector{String},FunctionCallback,Vector})
+    return "$(join(vec, "/")): $(cb.eval)\n$(show_exploded(child))"
+end
 
+function Base.show(io::IO, ::MIME"text/plain", node::TrieNode)
+    return if isempty(node.children)
+        print(io, node)
+    else
+        print(io, show_exploded(explode(node)))
+    end
+end
+function Base.show(node::TrieNode)
+    return isempty(node.children) ? print(node) : print(show_exploded(explode(node)))
+end
 
-Base.show(io::IO, ::MIME"text/plain", node::TrieNode) =
-    isempty(node.children) ? print(io, node) : print(io, show_exploded(explode(node)))
-Base.show(node::TrieNode) =
-    isempty(node.children) ? print(node) : print(show_exploded(explode(node)))
-
-function show_tree(node::TrieNode, prefix::String = "", is_last::Bool = true)
+function show_tree(node::TrieNode, prefix::String="", is_last::Bool=true)
     tree_string = ""
 
     # Get the children keys
@@ -183,12 +201,14 @@ function show_tree(node::TrieNode, prefix::String = "", is_last::Bool = true)
         # Print the key with the appropriate prefix
         tree_string *= (prefix * current_prefix * key)
 
-        tree_string *=
-            isa(node.children[key].cb, FunctionCallback) ?
-            "{$(node.children[key].cb.eval)}\n" : "\n"
+        tree_string *= if isa(node.children[key].cb, FunctionCallback)
+            "{$(node.children[key].cb.eval)}\n"
+        else
+            "\n"
+        end
 
         # Recursively print the child nodes
         tree_string *= show_tree(node.children[key], prefix * next_prefix, is_last_child)
     end
-    tree_string
+    return tree_string
 end

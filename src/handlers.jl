@@ -15,7 +15,6 @@ function handle_connack(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     end
 end
 
-
 function handle_publish(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     dup = (flags & 0x08) >> 3
     qos = (flags & 0x06) >> 1
@@ -59,12 +58,12 @@ end
 
 function handle_pubrec(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     id = mqtt_read(s, UInt16)
-    write_packet(client, PUBREL  | 0x02, id)
+    return write_packet(client, PUBREL | 0x02, id)
 end
 
 function handle_pubrel(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     id = mqtt_read(s, UInt16)
-    write_packet(client, PUBCOMP, id)
+    return write_packet(client, PUBCOMP, id)
 end
 
 function handle_suback(client::Client, s::IO, cmd::UInt8, flags::UInt8)
@@ -82,21 +81,24 @@ function handle_pingresp(client::Client, s::IO, cmd::UInt8, flags::UInt8)
     if @atomic(client.ping_outstanding) == 0x1
         @atomicswap client.ping_outstanding = 0x0
     else
-        # We received a subresp packet we didn't ask for
-        # disconnect(client)
+        # We received a ping resp packet we didn't ask for
         @atomicswap client.state = 0x03
-        throw(ArgumentError("No outstanding ping. client.ping_outstanding = $(client.ping_outstanding) and should be 0x1"))
+        throw(
+            ArgumentError(
+                "No outstanding ping. client.ping_outstanding = $(client.ping_outstanding) and should be 0x1",
+            ),
+        )
     end
 end
 
-const HANDLERS = Dict{UInt8, Function}(
-                                       CONNACK => handle_connack,
-                                       PUBLISH => handle_publish,
-                                       PUBACK => handle_ack,
-                                       PUBREC => handle_pubrec,
-                                       PUBREL => handle_pubrel,
-                                       PUBCOMP => handle_ack,
-                                       SUBACK => handle_suback,
-                                       UNSUBACK => handle_ack,
-                                       PINGRESP => handle_pingresp
-                                      )
+const HANDLERS = Dict{UInt8,Function}(
+    CONNACK => handle_connack,
+    PUBLISH => handle_publish,
+    PUBACK => handle_ack,
+    PUBREC => handle_pubrec,
+    PUBREL => handle_pubrel,
+    PUBCOMP => handle_ack,
+    SUBACK => handle_suback,
+    UNSUBACK => handle_ack,
+    PINGRESP => handle_pingresp,
+)

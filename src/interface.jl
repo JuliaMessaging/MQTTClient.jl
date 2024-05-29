@@ -15,123 +15,120 @@
                    will::Message=Message(false, 0x00, false, "", UInt8[]),
                    clean_session::Bool=true)::Tuple
 
-    MakeConnection(io::T;
-                   ping_timeout=UInt64(60),
-                   keep_alive::Int64=32,
-                   client_id::String=randstring(8),
-                   user::User=User("", ""),
-                   will::Message=Message(false, 0x00, false, "", UInt8[]),
-                   clean_session::Bool=true)::Tuple where {T <: AbstractIOConnection}
-
-Creates an MQTT client connection to an MQTT broker, handling the construction 
-of both the `Client` and `MQTTConnection` objects. This function provides 
-flexible ways to specify the connection details either through a TCP connection 
+Creates an MQTT client connection to an MQTT broker, handling the construction
+of both the `Client` and `Connection` objects inside the `Configuration` struct. This function provides
+flexible ways to specify the connection details either through a TCP connection
 with host and port, a Unix Domain Socket path.
 
 # Arguments
-- `host::Union{IPAddr, String}`: The IP address or hostname of the MQTT broker.
-- `port::Int64`: The port number to connect to.
-- `path::String`: The file system path for Unix Domain Socket connection.
-- `io::T`: An object of subtype `AbstractIOConnection`.
-- `ping_timeout::UInt64`: The ping timeout in seconds (default: 60).
-- `keep_alive::Int64`: The keep-alive time in seconds (default: 32).
-- `client_id::String`: The client identifier (default: a random string of length 8).
-- `user::User`: The user credentials for the MQTT broker (default: anonymous user).
-- `will::Message`: The last will message to be sent in case of unexpected disconnection (default: an empty will message).
-- `clean_session::Bool`: Indicates whether to start a clean session (default: true).
+
+  - `host::Union{IPAddr, String}`: The IP address or hostname of the MQTT broker.
+  - `port::Int64`: The port number to connect to.
+  - `path::String`: The file system path for Unix Domain Socket connection.
+  - `io::T`: An object of subtype `AbstractIOConnection`.
+  - `ping_timeout::UInt64`: The ping timeout in seconds (default: 60).
+  - `keep_alive::Int64`: The keep-alive time in seconds (default: 32).
+  - `client_id::String`: The client identifier (default: a random string of length 8).
+  - `user::User`: The user credentials for the MQTT broker (default: anonymous user).
+  - `will::Message`: The last will message to be sent in case of unexpected disconnection (default: an empty will message).
+  - `clean_session::Bool`: Indicates whether to start a clean session (default: true).
 
 # Returns
-- A tuple `(Client, MQTTConnection)` where `Client` is the MQTT client instance 
-  and `MQTTConnection` is the connection information used to connect to the broker.
 
-This function simplifies the process of setting up an MQTT client connection. 
-Depending on the type of connection, you can specify the broker's IP address 
-and port, a Unix Domain Socket path, or directly provide any struct that is a subtype of `AbstractIOConnection`. 
-It then constructs the necessary `Client` and `MQTTConnection` objects with the 
-provided or default parameters. Refer to the documentation for [`Client`](@ref) and 
-[`MQTTConnection`](@ref) for more details on their fields and usage.
+  - A `Configuration` struct where `client::Client` is the MQTT client instance
+    and `connection::Connection` is the connection information used to connect to the broker.
+
+This function simplifies the process of setting up an MQTT client connection.
+Depending on the type of connection, you can specify the broker's IP address
+and port or a Unix Domain Socket path, it infers the Protocol and then constructs the necessary
+provided or default parameters. Refer to the documentation for [`Client`](@ref) and
+[`Connection`](@ref) object.
 
 ## Examples
 
 ```julia
 # Example with IP address and port
-client, connection = MakeConnection("127.0.0.1", 1883, client_id="mqtt_client_1")
+client, connection = MakeConnection("127.0.0.1", 1883; client_id="mqtt_client_1")
 
 # Example with Unix Domain Socket path
-client, connection = MakeConnection("/var/run/mqtt.sock", user=User("user", "pass"))
-
-# Example with provided connection
-tcp_conn = TCP(Sockets.localhost, 1883)
-client, connection = MakeConnection(tcp_conn; keep_alive=60, clean_session=false)
+client, connection = MakeConnection("/var/run/mqtt.sock"; user=User("user", "pass"))
 ```
 """
-function MakeConnection(host::Union{IPAddr, String}, port::Int64;
-        ping_timeout=UInt64(60),
-        keep_alive::Int64=32,
-        client_id::String=randstring(8),
-        user::User=User("", ""),
-        will::Message=Message(false, 0x00, false, "", UInt8[]),
-        clean_session::Bool=true)::Tuple 
-    MakeConnection(IOConnection(host,port),ping_timeout,keep_alive,client_id,user,will,clean_session)
+function MakeConnection(
+    host::Union{IPAddr,String},
+    port::Int64;
+    ping_timeout=UInt64(60),
+    keep_alive::Int64=32,
+    client_id::String=randstring(8),
+    user::User=User("", ""),
+    will::Message=Message(false, 0x00, false, "", UInt8[]),
+    clean_session::Bool=true,
+)::Configuration
+    return Configuration(
+        IOConnection(host, port),
+        ping_timeout,
+        keep_alive,
+        client_id,
+        user,
+        will,
+        clean_session,
+    )
 end
-function MakeConnection(path::String;
-        ping_timeout=UInt64(60),
-        keep_alive::Int64=32,
-        client_id::String=randstring(8),
-        user::User=User("", ""),
-        will::Message=Message(false, 0x00, false, "", UInt8[]),
-        clean_session::Bool=true)::Tuple 
-    MakeConnection(IOConnection(path),ping_timeout,keep_alive,client_id,user,will,clean_session)
+function MakeConnection(
+    path::String;
+    ping_timeout=UInt64(60),
+    keep_alive::Int64=32,
+    client_id::String=randstring(8),
+    user::User=User("", ""),
+    will::Message=Message(false, 0x00, false, "", UInt8[]),
+    clean_session::Bool=true,
+)::Configuration
+    return Configuration(
+        IOConnection(path), ping_timeout, keep_alive, client_id, user, will, clean_session
+    )
 end
-function MakeConnection(io::T,
-        ping_timeout=UInt64(60),
-        keep_alive::Int64=32,
-        client_id::String=randstring(8),
-        user::User=User("", ""),
-        will::Message=Message(false, 0x00, false, "", UInt8[]),
-        clean_session::Bool=true)::Tuple where {T <: AbstractIOConnection}
-    (Client(ping_timeout), MQTTConnection(io, keep_alive, client_id, user, will, clean_session))
-end
-
 
 """
-    connect_async(client::Client, connection::MQTTConnection)
+    connect_async(client::Client, connection::Connection)
 
-Establishes an asynchronous connection to the MQTT broker using the provided `Client` and `MQTTConnection` objects. This function initializes the client, establishes the connection, and starts the necessary loops for communication.
+Establishes an asynchronous connection to the MQTT broker using the provided `Client` and `Connection` objects. This function initializes the client, establishes the connection, and starts the necessary loops for communication.
 
 # Arguments
-- `client::Client`: The MQTT client instance.
-- `connection::MQTTConnection`: The connection information used to connect to the broker.
+
+  - `client::Client`: The MQTT client instance.
+  - `connection::Connection`: The connection information used to connect to the broker.
 
 # Returns
-- A `Future` object that can be used to await the completion of the connection process.
+
+  - A `Future` object that can be used to await the completion of the connection process.
 
 ## Example
 
 ```julia
-client, connection = MakeConnection("127.0.0.1", 1883, client_id="mqtt_client_1")
+client, connection = MakeConnection("127.0.0.1", 1883; client_id="mqtt_client_1")
 future = connect_async(client, connection)
 wait(future)
 ```
 
 # See Also
-- [`connect`](@ref): The synchronous version of this function.
+
+  - [`connect`](@ref): The synchronous version of this function.
 """
-function connect_async(client::Client, connection::MQTTConnection)
+function connect_async(client::Client, connection::Connection)
     if !isready(client)
-            @atomicswap client.state = 0x00
-            client.on_msg = TrieNode()
-            @atomicswap client.last_id = 0x0000
-            client.in_flight = Dict{UInt16, Future}()
-            client.write_packets = Channel{Packet}(typemax(Int64))
-            client.socket = IOBuffer()
-            client.socket_lock = ReentrantLock()
-            @atomicswap client.ping_outstanding = 0
-            @atomicswap client.last_sent = 0.0
-            @atomicswap client.last_received = 0.0
-            client.write_task = Task(nothing)
-            client.read_task = Task(nothing)
-            client.keep_alive_task = Task(nothing)
+        @atomicswap client.state = 0x00
+        client.on_msg = TrieNode()
+        @atomicswap client.last_id = 0x0000
+        client.in_flight = Dict{UInt16,Future}()
+        client.write_packets = Channel{Packet}(typemax(Int64))
+        client.socket = IOBuffer()
+        client.socket_lock = ReentrantLock()
+        @atomicswap client.ping_outstanding = 0
+        @atomicswap client.last_sent = 0.0
+        @atomicswap client.last_received = 0.0
+        client.write_task = Task(nothing)
+        client.read_task = Task(nothing)
+        client.keep_alive_task = Task(nothing)
     end
 
     try
@@ -167,37 +164,48 @@ function connect_async(client::Client, connection::MQTTConnection)
     end
 
     if length(connection.will.topic) > 0
-        optional_will = (connection.will.topic, convert(UInt16, length(connection.will.payload)), connection.will.payload)
-        connect_flags |= 0x04 | ((connection.will.qos & 0x03) << 3) | ((connection.will.retain & 0x01) << 5)
+        optional_will = (
+            connection.will.topic,
+            convert(UInt16, length(connection.will.payload)),
+            connection.will.payload,
+        )
+        connect_flags |=
+            0x04 |
+            ((connection.will.qos & 0x03) << 3) |
+            ((connection.will.retain & 0x01) << 5)
     end
 
     future = Future()
     client.in_flight[0x0000] = future
 
-    write_packet(client, CONNECT,
-                 protocol_name,
-                 protocol_level,
-                 connect_flags,
-                 client.keep_alive,
-                 connection.client_id,
-                 optional_user...,
-                 optional_will...)
+    write_packet(
+        client,
+        CONNECT,
+        protocol_name,
+        protocol_level,
+        connect_flags,
+        client.keep_alive,
+        connection.client_id,
+        optional_user...,
+        optional_will...,
+    )
 
     return future
 end
 
-
 """
-    connect(client::Client, connection::MQTTConnection)
+    connect(client::Client, connection::Connection)
 
-Establishes a synchronous connection to the MQTT broker using the provided [`Client`](@ref) and [`MQTTConnection`](@ref) objects. This function wraps [`connect_async`](@ref) and waits for the connection process to complete.
+Establishes a synchronous connection to the MQTT broker using the provided [`Client`](@ref) and [`Connection`](@ref) objects. This function wraps [`connect_async`](@ref) and waits for the connection process to complete.
 
 # Arguments
-- `client::Client`: The MQTT client instance.
-- `connection::MQTTConnection`: The connection information used to connect to the broker.
+
+  - `client::Client`: The MQTT client instance.
+  - `connection::Connection`: The connection information used to connect to the broker.
 
 # Returns
-- The result of the connection process after it completes.
+
+  - The result of the connection process after it completes.
 
 The connect function is responsible for establishing a connection between an MQTT client and an MQTT broker. It initializes the client's state, sets up the necessary communication channels, and handles the connection handshake according to the MQTT protocol. When called, connect first ensures that the client's state and resources are properly initialized. This includes resetting the client's state, setting up the socket connection, and creating the channels and locks required for communication. The function then starts the asynchronous tasks needed to manage the read, write, and keep-alive loops, which are crucial for maintaining the connection and ensuring that messages are sent and received properly.
 
@@ -206,17 +214,17 @@ Additionally, the connect function handles the specifics of the MQTT protocol ha
 ## Example
 
 ```julia
-client, connection = MakeConnection("127.0.0.1", 1883, client_id="mqtt_client_1")
+client, connection = MakeConnection("127.0.0.1", 1883; client_id="mqtt_client_1")
 result = connect(client, connection)
 ```
 
 # See Also
-- [`connect_async`](@ref): The asynchronous version of this function.
-- [`Client`](@ref)
-- [`MQTTConnection`](@ref)
-"""
-connect(client::Client, connection::MQTTConnection) = fetch(connect_async(client, connection))
 
+  - [`connect_async`](@ref): The asynchronous version of this function.
+  - [`Client`](@ref)
+  - [`Connection`](@ref)
+"""
+connect(client::Client, connection::Connection) = fetch(connect_async(client, connection))
 
 """
     disconnect(client::Client)
@@ -247,7 +255,7 @@ function disconnect(client::Client)
 
     res = fetch(client)
     @debug "MQTT client disconnected with async task states: $res"
-    res
+    return res
 end
 
 """
@@ -256,17 +264,20 @@ end
 Subscribe to a topic asynchronously.
 
 # Arguments
-- `client::Client`: The MQTT client.
-- `topic::String`: The topic to subscribe to.
-- `on_msg::Function`: The function to call when a message is received on the topic.
-- `qos::UInt8`: The quality of service level to use for the subscription. Default is 0.
+
+  - `client::Client`: The MQTT client.
+  - `topic::String`: The topic to subscribe to.
+  - `on_msg::Function`: The function to call when a message is received on the topic.
+  - `qos::UInt8`: The quality of service level to use for the subscription. Default is 0.
 
 # Returns
-- `Future`: A future that can be used to wait for the subscription to complete.
+
+  - `Future`: A future that can be used to wait for the subscription to complete.
 
 # Examples
+
 ```julia
-future = subscribe_async(client, "my/topic", on_msg, qos=QOS_2)
+future = subscribe_async(client, "my/topic", on_msg; qos=QOS_2)
 ```
 """
 function subscribe_async(client, topic, on_msg; qos=QOS_0)
@@ -285,31 +296,40 @@ end
 Subscribe to a topic.
 
 # Arguments
-- `client::Client`: The MQTT client.
-- `topic::String`: The topic to subscribe to.
-- `on_msg::Function`: The function to call when a message is received on the topic.
-- `qos::UInt8`: The quality of service level to use for the subscription. Default is 0.
+
+  - `client::Client`: The MQTT client.
+  - `topic::String`: The topic to subscribe to.
+  - `on_msg::Function`: The function to call when a message is received on the topic.
+  - `qos::UInt8`: The quality of service level to use for the subscription. Default is 0.
 
 # Examples
+
 ```julia
 subscribe(client, "my/topic", on_msg)
 ```
 """
-subscribe(client, topic, on_msg; qos=QOS_0) = resolve(subscribe_async(client, topic, on_msg, qos=qos))
-
+subscribe(client, topic, on_msg; qos=QOS_0) =
+    resolve(subscribe_async(client, topic, on_msg; qos=qos))
 
 """
     unsubscribe_async(client::Client, topics::String...)
 
 Unsubscribes the `Client` instance from the supplied topic names.
 Deletes the callback from the client
-Returns a `Future` object that contains `nothing` on success and an exception on failure. 
+Returns a `Future` object that contains `nothing` on success and an exception on failure.
 """
+function unsubscribe_async(client::Client, topic::String)
+    future = Future()
+    id = packet_id(client)
+    client.in_flight[id] = future
+    write_packet(client, UNSUBSCRIBE | 0x02, id, topic)
+    remove!(client.on_msg, topic)
+    return future
+end
 function unsubscribe_async(client::Client, topics::String...)
     future = Future()
     id = packet_id(client)
     client.in_flight[id] = future
-    topic_data = []
     write_packet(client, UNSUBSCRIBE | 0x02, id, topics...)
     ((t) -> remove!(client.on_msg, t)).(topics)
     return future
@@ -321,12 +341,13 @@ end
 Unsubscribes the `Client` instance from the supplied topic names.
 Waits until the unsubscribe is fully acknowledged. Returns `nothing` on success and an exception on failure.
 """
-unsubscribe(client::Client, topics::String...) = resolve(unsubscribe_async(client, topics...))
+unsubscribe(client::Client, topics::String...) =
+    resolve(unsubscribe_async(client, topics...))
 
 """
-   publish_async(client::Client, message::Message)
+publish_async(client::Client, message::Message)
 
-Publishes the message. Returns a `Future` object that contains `nothing` on success and an exception on failure. 
+Publishes the message. Returns a `Future` object that contains `nothing` on success and an exception on failure.
 """
 function publish_async(client::Client, message::Message)
     future = Future()
@@ -353,22 +374,30 @@ end
        qos::QOS=QOS_0,
        retain::Bool=false)
 
-Pulishes a message with the specified parameters. Returns a `Future` object that contains `nothing` on success and an exception on failure.  
+Pulishes a message with the specified parameters. Returns a `Future` object that contains `nothing` on success and an exception on failure.
 """
-publish_async(client::Client, topic::String, payload...;
-              dup::Bool=false,
-              qos::QOS=QOS_0,
-              retain::Bool=false) = publish_async(client, Message(dup, UInt8(qos), retain, topic, payload...))
+publish_async(
+    client::Client,
+    topic::String,
+    payload...;
+    dup::Bool=false,
+    qos::QOS=QOS_0,
+    retain::Bool=false,
+) = publish_async(client, Message(dup, UInt8(qos), retain, topic, payload...))
 
 """
-   publish(client::Client, topic::String, payload...;
-      dup::Bool=false,
-      qos::QOS=QOS_0,
-      retain::Bool=false)
+publish(client::Client, topic::String, payload...;
+dup::Bool=false,
+qos::QOS=QOS_0,
+retain::Bool=false)
 
- Waits until the publish is completely acknowledged. Publishes a message with the specified parameters. Returns `nothign` on success and throws an exception on failure.
- """
- publish(client::Client, topic::String, payload...;
-         dup::Bool=false,
-         qos::QOS=QOS_0,
-         retain::Bool=false) = resolve(publish_async(client, topic, payload..., dup=dup, qos=qos, retain=retain))
+Waits until the publish is completely acknowledged. Publishes a message with the specified parameters. Returns `nothign` on success and throws an exception on failure.
+"""
+publish(
+    client::Client,
+    topic::String,
+    payload...;
+    dup::Bool=false,
+    qos::QOS=QOS_0,
+    retain::Bool=false,
+) = resolve(publish_async(client, topic, payload...; dup=dup, qos=qos, retain=retain))
