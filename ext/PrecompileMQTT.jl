@@ -14,7 +14,7 @@ using MQTTClient
     # Putting some things in `@setup_workload` instead of `@compile_workload` can reduce the size of the
     # precompile file and potentially make loading faster.
 
-    cb(t,p) = nothing
+    cb(t, p) = nothing
     topic = "foo"
     payload = "bar"
 
@@ -36,7 +36,11 @@ using MQTTClient
 
         message = MQTTClient.Message(false, UInt8(MQTTClient.QOS_0), false, topic, payload)
         optional = message.qos == 0x00 ? () : (0)
-        cmd = MQTTClient.PUBLISH | ((message.dup & 0x1) << 3) | (message.qos << 1) | message.retain
+        cmd =
+            MQTTClient.PUBLISH |
+            ((message.dup & 0x1) << 3) |
+            (message.qos << 1) |
+            message.retain
         packet = MQTTClient.Packet(cmd, [message.topic, optional..., message.payload])
         buffer = PipeBuffer()
         for i in packet.data
@@ -70,7 +74,6 @@ using MQTTClient
         MQTTClient.handle_pubrel(c, s, cmd, flags)
         p = take!(c.write_packets)
 
-
         # handle_suback
         c = MQTTClient.Client()
         s = IOBuffer()
@@ -96,14 +99,13 @@ using MQTTClient
         ## Interfaces:
         # subscribe
         c = MQTTClient.Client()
-        future = MQTTClient.subscribe_async(c, topic, cb, qos=MQTTClient.QOS_2)
+        future = MQTTClient.subscribe_async(c, topic, cb; qos=MQTTClient.QOS_2)
 
         # unsubscribe
-        c =  MQTTClient.Client()
+        c = MQTTClient.Client()
         insert!(c.on_msg, topic, cb)
         @atomicswap c.last_id = 0x0
         future = unsubscribe_async(c, topic)
-
 
         ## TCP Basic Run
         server = MQTTClient.MockMQTTBroker(ip"127.0.0.1", 1889)
@@ -112,7 +114,7 @@ using MQTTClient
         connect(client, conn)
 
         subscribe(client, "foo/bar", cb)
-        publish(client, "bar/foo", qos=QOS_2)
+        publish(client, "bar/foo", "baz"; qos=QOS_2)
         unsubscribe(client, "foo/bar")
 
         disconnect(client)
@@ -125,7 +127,7 @@ using MQTTClient
         connect(client, conn)
 
         subscribe(client, "foo/bar", cb)
-        publish(client, "bar/foo")
+        publish(client, "bar/foo", "baz")
         unsubscribe(client, "foo/bar")
 
         disconnect(client)

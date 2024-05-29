@@ -9,7 +9,7 @@ cb(args...) = nothing
 
     res = subscribe(client, "foo/bar", cb)
     @test res == [0x01, 0x00]
-    res = publish(client, "bar/foo", qos=QOS_2)
+    res = publish(client, "bar/foo", "baz" qos=QOS_2)
     @test isnothing(res)
     res = unsubscribe(client, "foo/bar")
     @test isnothing(res)
@@ -24,7 +24,11 @@ cb(args...) = nothing
     @test res == (0x00, 0x00, 0x00)
 
     @test MQTTClient.isclosed(client)
-    close(server)
+    @test isopen(server)
+
+    close(server)  # stop the mock server
+
+    @test !isopen(server)
 end
 
 @testset "UDS Client" begin
@@ -37,7 +41,7 @@ end
 
     res = subscribe(client, "foo/bar", cb)
     @test res == [0x01, 0x00]
-    res = publish(client, "bar/foo")
+    res = publish(client, "bar/foo", "baz")
     @test res == 0
     res = unsubscribe(client, "foo/bar")
     @test isnothing(res)
@@ -52,5 +56,9 @@ end
     @test res == (0x00, 0x00, 0x00)
 
     @test MQTTClient.isclosed(client)
-    close(server)
+    @test isopen(server)
+
+    close(server) # stop the mock server
+
+    @test !isopen(server)
 end

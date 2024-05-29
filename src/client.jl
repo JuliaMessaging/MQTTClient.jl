@@ -1,28 +1,30 @@
 """
     Client
 
-The MQTT client in Julia facilitates communication between a device and an MQTT broker over a network. 
-It manages connections, message handling, and maintains the state of communication. 
-The client operates through three main loops: the read loop listens for incoming messages from the broker and processes them using designated handlers; 
-the write loop sends packets to the broker from a queue, ensuring thread safety with a socket lock; 
-and the keep-alive loop periodically sends ping requests to the broker to maintain the connection and detect disconnections. 
+The MQTT client in Julia facilitates communication between a device and an MQTT broker over a network.
+It manages connections, message handling, and maintains the state of communication.
+The client operates through three main loops: the read loop listens for incoming messages from the broker and processes them using designated handlers;
+the write loop sends packets to the broker from a queue, ensuring thread safety with a socket lock;
+and the keep-alive loop periodically sends ping requests to the broker to maintain the connection and detect disconnections.
 This client uses atomic operations to ensure thread safety for shared variables and supports asynchronous task management for efficient, non-blocking operations.
 
 # Fields
-- `state::UInt8`: client state.
-- `on_msg::TrieNode`: A trie mapping topics to callback functions.
-- `keep_alive::UInt16`: The keep-alive time in seconds.
-- `last_id::UInt16`: The last packet identifier used.
-- `in_flight::Dict{UInt16, Future}`: A dictionary mapping packet identifiers to futures.
-- `write_packets::AbstractChannel`: A channel for writing packets.
-- `socket`: The socket used for communication with the broker.
-- `socket_lock`: A lock for synchronizing access to the socket.
-- `ping_timeout::UInt64`: The ping timeout in seconds.
-- `ping_outstanding::Atomic{UInt8}`: An atomic counter for the number of outstanding ping requests.
-- `last_sent::Atomic{Float64}`: An atomic float representing the timestamp of the last sent packet.
-- `last_received::Atomic{Float64}`: An atomic float representing the timestamp of the last received packet.
+
+  - `state::UInt8`: client state.
+  - `on_msg::TrieNode`: A trie mapping topics to callback functions.
+  - `keep_alive::UInt16`: The keep-alive time in seconds.
+  - `last_id::UInt16`: The last packet identifier used.
+  - `in_flight::Dict{UInt16, Future}`: A dictionary mapping packet identifiers to futures.
+  - `write_packets::AbstractChannel`: A channel for writing packets.
+  - `socket`: The socket used for communication with the broker.
+  - `socket_lock`: A lock for synchronizing access to the socket.
+  - `ping_timeout::UInt64`: The ping timeout in seconds.
+  - `ping_outstanding::Atomic{UInt8}`: An atomic counter for the number of outstanding ping requests.
+  - `last_sent::Atomic{Float64}`: An atomic float representing the timestamp of the last sent packet.
+  - `last_received::Atomic{Float64}`: An atomic float representing the timestamp of the last received packet.
 
 # Constructor
+
 `Client(ping_timeout::UInt64=UInt64(60))` constructs a new `Client` object with the specified ping timeout (default: 60 seconds).
 """
 mutable struct Client <: AbstractConfigElement
@@ -50,25 +52,26 @@ mutable struct Client <: AbstractConfigElement
     read_task::Task
     keep_alive_task::Task
 
-    Client(ping_timeout::UInt64 = UInt64(60)) = new(
-        0x00,
-        TrieNode(),
-        0x0000,
-        0x0000,
-        Dict{UInt16,Future}(),
-        Channel{Packet}(typemax(Int64)),
-        IOBuffer(),
-        ReentrantLock(),
-        ping_timeout,
-        0x00,
-        0.0,
-        0.0,
-        Task(nothing),
-        Task(nothing),
-        Task(nothing),
-    )
+    function Client(ping_timeout::UInt64=UInt64(60))
+        return new(
+            0x00,
+            TrieNode(),
+            0x0000,
+            0x0000,
+            Dict{UInt16,Future}(),
+            Channel{Packet}(typemax(Int64)),
+            IOBuffer(),
+            ReentrantLock(),
+            ping_timeout,
+            0x00,
+            0.0,
+            0.0,
+            Task(nothing),
+            Task(nothing),
+            Task(nothing),
+        )
+    end
 end
-
 
 function write_loop(client::Client)::UInt8
     try
@@ -115,7 +118,6 @@ function write_loop(client::Client)::UInt8
     end
 end
 
-
 function read_loop(client::Client)::UInt8
     try
         while !isclosed(client)
@@ -157,18 +159,17 @@ function read_loop(client::Client)::UInt8
     end
 end
 
-
 function keep_alive_loop(client::Client)::UInt8
     ping_sent = time()
 
     # TODO: improve, this causes reconnect to take ~1 second. is there a way to interupt?
     check_interval = 1
-     
-    timer = Timer(0, interval = check_interval)
+
+    timer = Timer(0; interval=check_interval)
 
     while !isclosed(client)
         if time() - @atomic(client.last_sent) >= client.keep_alive ||
-           time() - @atomic(client.last_received) >= client.keep_alive
+            time() - @atomic(client.last_received) >= client.keep_alive
             if @atomic(client.ping_outstanding) == 0x0
                 @atomicswap client.ping_outstanding = 0x1
                 try
@@ -191,7 +192,7 @@ function keep_alive_loop(client::Client)::UInt8
         end
 
         if @atomic(client.ping_outstanding) == 1 &&
-           time() - ping_sent >= client.ping_timeout
+            time() - ping_sent >= client.ping_timeout
             try # No pingresp received
                 disconnect(client)
                 break
@@ -222,7 +223,7 @@ end
 
 # write packet to mqtt broker
 function write_packet(client::Client, cmd::UInt8, data...)
-    put!(client.write_packets, Packet(cmd, data))
+    return put!(client.write_packets, Packet(cmd, data))
 end
 
 isready(client::Client)::Bool = client.state == 0x00
@@ -230,10 +231,12 @@ isconnected(client::Client)::Bool = client.state == 0x01
 isclosed(client::Client)::Bool = client.state >= 0x02
 iserror(client::Client)::Bool = client.state == 0x03
 
-show(io::IO, client::Client) = print(
-    io,
-    "MQTTClient[state: $(get(CLIENT_STATE, client.state, :unknown)), read_loop: $(taskstatus(client.read_task)), write_loop: $(taskstatus(client.write_task)), keep_alive: $(taskstatus(client.keep_alive_task))]\n$(show_tree(client.on_msg))",
-)
+function show(io::IO, client::Client)
+    return print(
+        io,
+        "MQTTClient[state: $(get(CLIENT_STATE, client.state, :unknown)), read_loop: $(taskstatus(client.read_task)), write_loop: $(taskstatus(client.write_task)), keep_alive: $(taskstatus(client.keep_alive_task))]\n$(show_tree(client.on_msg))",
+    )
+end
 
 fetch(client::Client)::Tuple{UInt8,UInt8,UInt8} = begin
     try

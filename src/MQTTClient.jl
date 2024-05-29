@@ -8,7 +8,6 @@ import Base: ReentrantLock, lock, unlock, convert, PipeEndpoint, fetch, show
 import Base: @atomic, @atomicreplace, @atomicswap, Ref, RefValue, isready
 using Base.Threads
 
-
 include("utils.jl")
 include("internals.jl")
 include("topic.jl")
@@ -17,8 +16,7 @@ include("connection.jl")
 include("handlers.jl")
 include("interface.jl")
 
-export
-    MakeConnection,
+export MakeConnection,
     Configuration,
     Client,
     Connection,

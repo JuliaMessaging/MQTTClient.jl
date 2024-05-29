@@ -1,5 +1,5 @@
-function on_msg(t,p)
-    (t,p)
+function on_msg(t, p)
+    return (t, p)
 end
 
 @testset verbose = true "MQTT Client functionality" begin
@@ -24,7 +24,9 @@ end
     end
 
     @testset "MQTT Message" begin
-        msg = MQTTClient.Message(true, QOS_0, true, "test/mqtt_jl", "testing the MQTTClient.jl package")
+        msg = MQTTClient.Message(
+            true, QOS_0, true, "test/mqtt_jl", "testing the MQTTClient.jl package"
+        )
         @test msg isa MQTTClient.Message
 
         msg = MQTTClient.Message(false, 0x01, false, "test", "payload")
@@ -32,23 +34,45 @@ end
         @test msg.qos == 0x01
         @test msg.retain == false
         @test msg.topic == "test"
-        @test msg.payload == [UInt8('p'), UInt8('a'), UInt8('y'), UInt8('l'), UInt8('o'), UInt8('a'), UInt8('d')]
+        @test msg.payload == [
+            UInt8('p'),
+            UInt8('a'),
+            UInt8('y'),
+            UInt8('l'),
+            UInt8('o'),
+            UInt8('a'),
+            UInt8('d'),
+        ]
 
         msg = MQTTClient.Message(MQTTClient.QOS_2, "test", "payload")
         @test msg.dup == false
         @test msg.qos == 0x02
         @test msg.retain == false
         @test msg.topic == "test"
-        @test msg.payload == [UInt8('p'), UInt8('a'), UInt8('y'), UInt8('l'), UInt8('o'), UInt8('a'), UInt8('d')]
+        @test msg.payload == [
+            UInt8('p'),
+            UInt8('a'),
+            UInt8('y'),
+            UInt8('l'),
+            UInt8('o'),
+            UInt8('a'),
+            UInt8('d'),
+        ]
     end
 
     @testset "write_loop" begin
         c = MQTTClient.Client()
         c.socket = TCPSocket()
         close(c.socket)
-        message = MQTTClient.Message(false, UInt8(MQTTClient.QOS_2), false, "test/foo", "payload")
+        message = MQTTClient.Message(
+            false, UInt8(MQTTClient.QOS_2), false, "test/foo", "payload"
+        )
         optional = message.qos == 0x00 ? () : (2)
-        cmd = MQTTClient.PUBLISH | ((message.dup & 0x1) << 3) | (message.qos << 1) | message.retain
+        cmd =
+            MQTTClient.PUBLISH |
+            ((message.dup & 0x1) << 3) |
+            (message.qos << 1) |
+            message.retain
         packet = MQTTClient.Packet(cmd, [message.topic, optional..., message.payload])
         put!(c.write_packets, packet)
 
@@ -110,7 +134,6 @@ end
     end
 end
 
-
 @testset verbose = true "MQTT interface functionality" begin
     @testset "Make MQTT tcp connection" begin
         c, conn = MQTTClient.MakeConnection("localhost", 1883)
@@ -126,26 +149,27 @@ end
         @test c isa MQTTClient.Client
         @test conn isa MQTTClient.Connection
     end
-    
+
     @testset "Test Client show function" begin
         io = IOBuffer()
         client, conn = MQTTClient.MakeConnection("localhost", 1883)
         show(io, client)
-        str = take!(io) |> String
-        @test str == "MQTTClient[state: ready, read_loop: ready, write_loop: ready, keep_alive: ready]\n"
+        str = String(take!(io))
+        @test str ==
+            "MQTTClient[state: ready, read_loop: ready, write_loop: ready, keep_alive: ready]\n"
     end
     @testset "Test Connection show function" begin
         io = IOBuffer()
-        client, conn = MQTTClient.MakeConnection("localhost", 1883, client_id="foo")
+        client, conn = MQTTClient.MakeConnection("localhost", 1883; client_id="foo")
         show(io, conn)
-        str = take!(io) |> String
+        str = String(take!(io))
         @test contains(str, "Connection(Protocol: MQTTClient.TCP")
     end
 
     @testset "MQTT subscribe async" begin
         c = MQTTClient.Client()
         cb(p...) = print(p)
-        fut = MQTTClient.subscribe_async(c, "test-topic/#", cb, qos=MQTTClient.QOS_2)
+        fut = MQTTClient.subscribe_async(c, "test-topic/#", cb; qos=MQTTClient.QOS_2)
         @test fut isa Distributed.Future
     end
 
@@ -174,7 +198,7 @@ end
 
         # Check that the write_packet function was called with the correct arguments
         p = take!(client.write_packets)
-        @test p == MQTTClient.Packet(MQTTClient.UNSUBSCRIBE  | 0x02, (0x0002, "topic1"))
+        @test p == MQTTClient.Packet(MQTTClient.UNSUBSCRIBE | 0x02, (0x0002, "topic1"))
 
         cb1(x...) = print("[1] ", x)
         cb2(x...) = print("[2] ", x)
@@ -190,11 +214,13 @@ end
 
         # Check that the write_packet function was called with the correct arguments
         p = take!(client.write_packets)
-        @test p == MQTTClient.Packet(MQTTClient.UNSUBSCRIBE  | 0x02, (0x0003, "topic1", "topic2", "topic3"))
+        @test p == MQTTClient.Packet(
+            MQTTClient.UNSUBSCRIBE | 0x02, (0x0003, "topic1", "topic2", "topic3")
+        )
     end
 end
 
-@testset verbose=true "handlers" begin
+@testset verbose = true "handlers" begin
     @testset "handle_connack" begin
         c = MQTTClient.Client()
         c.in_flight[0x0000] = Future()
@@ -221,14 +247,20 @@ end
         #! TODO: fix this test.
         c = MQTTClient.Client()
         ch = Channel{String}(5)
-        cb1(t,p) = put!(ch, strip(String(p),'\0'))
-        cb2(t,p) = put!(ch, strip(String(p),'\0'))
+        cb1(t, p) = put!(ch, strip(String(p), '\0'))
+        cb2(t, p) = put!(ch, strip(String(p), '\0'))
         insert!(c.on_msg, "test", cb1)
         insert!(c.on_msg, "test/#", cb2)
 
-        message = MQTTClient.Message(false, UInt8(MQTTClient.QOS_0), false, "test", "payload")
+        message = MQTTClient.Message(
+            false, UInt8(MQTTClient.QOS_0), false, "test", "payload"
+        )
         optional = message.qos == 0x00 ? () : (0)
-        cmd = MQTTClient.PUBLISH | ((message.dup & 0x1) << 3) | (message.qos << 1) | message.retain
+        cmd =
+            MQTTClient.PUBLISH |
+            ((message.dup & 0x1) << 3) |
+            (message.qos << 1) |
+            message.retain
         packet = MQTTClient.Packet(cmd, [message.topic, optional..., message.payload])
         buffer = PipeBuffer()
         for i in packet.data
@@ -238,9 +270,15 @@ end
         payload = take!(ch)
         @test payload == "payload"
 
-        message = MQTTClient.Message(false, UInt8(MQTTClient.QOS_1), false, "test", "payload")
+        message = MQTTClient.Message(
+            false, UInt8(MQTTClient.QOS_1), false, "test", "payload"
+        )
         optional = message.qos == 0x00 ? () : (1)
-        cmd = MQTTClient.PUBLISH | ((message.dup & 0x1) << 3) | (message.qos << 1) | message.retain
+        cmd =
+            MQTTClient.PUBLISH |
+            ((message.dup & 0x1) << 3) |
+            (message.qos << 1) |
+            message.retain
         packet = MQTTClient.Packet(cmd, [message.topic, optional..., message.payload])
         buffer = PipeBuffer()
         for i in packet.data
@@ -250,9 +288,15 @@ end
         payload = take!(ch)
         @test payload == "payload"
 
-        message = MQTTClient.Message(false, UInt8(MQTTClient.QOS_2), false, "test", "payload")
+        message = MQTTClient.Message(
+            false, UInt8(MQTTClient.QOS_2), false, "test", "payload"
+        )
         optional = message.qos == 0x00 ? () : (2)
-        cmd = MQTTClient.PUBLISH | ((message.dup & 0x1) << 3) | (message.qos << 1) | message.retain
+        cmd =
+            MQTTClient.PUBLISH |
+            ((message.dup & 0x1) << 3) |
+            (message.qos << 1) |
+            message.retain
         packet = MQTTClient.Packet(cmd, [message.topic, optional..., message.payload])
         buffer = PipeBuffer()
         for i in packet.data
@@ -262,9 +306,15 @@ end
         payload = take!(ch)
         @test payload == "payload"
 
-        message = MQTTClient.Message(false, UInt8(MQTTClient.QOS_2), false, "test/foo", "payload")
+        message = MQTTClient.Message(
+            false, UInt8(MQTTClient.QOS_2), false, "test/foo", "payload"
+        )
         optional = message.qos == 0x00 ? () : (2)
-        cmd = MQTTClient.PUBLISH | ((message.dup & 0x1) << 3) | (message.qos << 1) | message.retain
+        cmd =
+            MQTTClient.PUBLISH |
+            ((message.dup & 0x1) << 3) |
+            (message.qos << 1) |
+            message.retain
         packet = MQTTClient.Packet(cmd, [message.topic, optional..., message.payload])
         buffer = PipeBuffer()
         for i in packet.data
@@ -313,7 +363,7 @@ end
         MQTTClient.handle_pubrec(c, s, cmd, flags)
         p = take!(c.write_packets)
         #!TODO: Figure out why the id changes
-        @test p == MQTTClient.Packet(MQTTClient.PUBREL  | 0x02, (0x0300,))
+        @test p == MQTTClient.Packet(MQTTClient.PUBREL | 0x02, (0x0300,))
     end
 
     @testset "handle_pubrel" begin
@@ -385,5 +435,4 @@ end
         # p = take!(c.write_packets)
         # @test p == MQTTClient.Packet(MQTTClient.DISCONNECT, ())
     end
-
 end

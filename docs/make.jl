@@ -1,4 +1,4 @@
-push!(LOAD_PATH,"../src/")
+push!(LOAD_PATH, "../src/")
 
 using MQTTClient
 using Documenter
@@ -21,15 +21,10 @@ makedocs(;
         "Getting Started" => "getting-started.md",
         "MQTT Interface Functions" => "interfaces.md",
         "MQTT Client" => "client.md",
-        "MQTT API" => [
-            "Client" => "api/client.md",
-            "Interfacing Functions" => "api/interface.md",
-            ],
+        "MQTT API" =>
+            ["Client" => "api/client.md", "Interfacing Functions" => "api/interface.md"],
         "Utils" => "utils.md",
     ],
 )
 
-deploydocs(;
-    repo="github.com/JuliaMessaging/MQTTClient.jl",
-    devbranch="main",
-)
+deploydocs(; repo="github.com/JuliaMessaging/MQTTClient.jl", devbranch="main")
