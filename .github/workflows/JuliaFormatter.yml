@@ -1,0 +1,47 @@
+name: Code Formatting
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+
+    steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.12.1
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: 1.9
+
+      - name: Install JuliaFormatter and format
+        shell: bash
+        run: julia -e 'import Pkg; Pkg.add("JuliaFormatter"); using JuliaFormatter; format(".")'
+
+      - name: Create Pull Request
+        id: pr
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: Format files using JuliaFormatter
+          title: ${{ format('[AUTO] Format {0} using JuliaFormatter', github.event.pull_request.number) }}
+          body: ${{ format('[JuliaFormatter.jl](https://github.com/domluna/JuliaFormatter.jl) would suggest these formatting changes against \#{0}.', github.event.pull_request.number) }}
+          labels: no changelog
+          branch: ${{ format('code-format/{0}', github.event.pull_request.number) }}
+          delete-branch: true
+
+      - name: Fail if a PR was needed
+        if: ${{ steps.pr.outputs.pull-request-operation == 'created' || steps.pr.outputs.pull-request-operation == 'updated' }}
+        shell: bash
+        run: exit 1
