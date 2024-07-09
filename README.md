@@ -18,11 +18,6 @@ This package supports using Transmission Control Protocol (TCP) as well as Unix 
 
 An example of how this package can be used is in the [examples/basic.jl](examples/basic.jl) file.
 
-## Sponsorship
-![sponsor logo](https://www.volkerwessels.com/dynamics/modules/SFIL0200/view.php?fil_Id=366300&thumb_nr=26)
-
-This package is developed and sponsored by [MapXact](https://mapxact.com/) and its development is driven by its use in production systems at MapXact. However, as an open-source project, we welcome all contributions, feedback, and feature requests.
-
 ## Contributing
 
 This package is using [MQTT protocol v3.1.1](https://docs.oasis-open.org/mqtt/mqtt/v3.1.1/mqtt-v3.1.1.html).
