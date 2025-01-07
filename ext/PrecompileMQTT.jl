@@ -121,8 +121,15 @@ using MQTTClient
         close(server)
 
         ## UDS Basic Run
-        server = MQTTClient.MockMQTTBroker("/tmp/testmqtt.sock")
-        client, conn = MakeConnection("/tmp/testmqtt.sock")
+        
+        # Windows requires specific pipe names: https://learn.microsoft.com/de-de/windows/win32/ipc/pipe-names?redirectedfrom=MSDN 
+        tmp_socket_name = if Sys.iswindows()
+            "\\\\.\\pipe\\tmp\\testmqtt.sock"
+        else
+            "/tmp/testmqtt.sock"
+        end
+        server = MQTTClient.MockMQTTBroker(tmp_socket_name)
+        client, conn = MakeConnection(tmp_socket_name)
 
         connect(client, conn)
 
