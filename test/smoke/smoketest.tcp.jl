@@ -21,6 +21,10 @@ try
 
         stress_test(tcp_test_client, tcp_test_conn)
     end
+
+    @testset "TCP connect options" begin
+        connect_options_test(tcp_test_conn)
+    end
 catch e
     if (e isa DNSError) || (e isa IOError)
         println("$(tcp_test_conn.protocol.ip):$(tcp_test_conn.protocol.port) not online -- skipping smoke test")

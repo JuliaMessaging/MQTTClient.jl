@@ -147,3 +147,36 @@ function stress_test(client, conn)
         count += 1
     end
 end
+
+function connect_options_test(conn)
+    println("Testing a username without a password")
+    client = Client()
+    user_conn = Connection(conn.protocol; user=User("presage", ""))
+    @test connect(client, user_conn) == 0x00
+    disconnect(client)
+
+    println("Testing clean_session=false")
+    # The broker keeps the subscription and queues QoS 1 messages while the client is offline
+    topic = "session/" * Random.randstring(8)
+    client_id = "session-" * Random.randstring(8)
+    received = Channel{String}(1)
+    client = Client()
+    session_conn = Connection(conn.protocol; client_id=client_id, clean_session=false)
+    connect(client, session_conn)
+    subscribe(client, topic, (t, p) -> put!(received, String(p)), qos=QOS_1)
+    disconnect(client)
+
+    publisher = Client()
+    connect(publisher, Connection(conn.protocol))
+    publish(publisher, topic, "queued", qos=QOS_1)
+    disconnect(publisher)
+
+    connect(client, session_conn)
+    @test timedwait(() -> isready(received), 5.0) === :ok
+    @test isready(received) && take!(received) == "queued"
+    disconnect(client)
+
+    # Clear the stored session
+    connect(client, Connection(conn.protocol; client_id=client_id))
+    disconnect(client)
+end

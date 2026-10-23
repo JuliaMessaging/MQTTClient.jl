@@ -117,7 +117,10 @@ wait(future)
 function connect_async(client::Client, connection::Connection)
     if !isready(client)
         @atomicswap client.state = 0x00
-        client.on_msg = TrieNode()
+        # A persistent session keeps its subscriptions on the broker, so keep their callbacks too
+        if connection.clean_session
+            client.on_msg = TrieNode()
+        end
         @atomicswap client.last_id = 0x0000
         client.in_flight = Dict{UInt16,Future}()
         client.write_packets = Channel{Packet}(typemax(Int64))
@@ -146,11 +149,9 @@ function connect_async(client::Client, connection::Connection)
         client.keep_alive_task = @async keep_alive_loop(client)
     end
 
-    #TODO reset client on clean_session = true
-
     protocol_name = "MQTT"
     protocol_level = 0x04 # v3.1.1
-    connect_flags = 0x02 # clean session
+    connect_flags = connection.clean_session ? 0x02 : 0x00
 
     local optional_user = ()
     local optional_will = ()
@@ -160,7 +161,7 @@ function connect_async(client::Client, connection::Connection)
         optional_user = (connection.user.name, connection.user.password)
     elseif length(connection.user.name) > 0
         connect_flags |= 0x80
-        optional_user = (connection.user.name)
+        optional_user = (connection.user.name,)
     end
 
     if length(connection.will.topic) > 0
