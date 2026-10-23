@@ -2,6 +2,7 @@
 Client
 Connection
 IOConnection
+MQTTClient.TLS
 MQTTClient.Message
 User
 Configuration

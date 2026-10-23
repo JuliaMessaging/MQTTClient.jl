@@ -121,6 +121,16 @@ end
         @test conn.clean_session == true
     end
 
+    @testset "MQTT TLS Connection" begin
+        conn = MQTTClient.Connection(MQTTClient.TLS("broker.example.com"; ca_file="ca.crt"))
+        @test conn.protocol isa MQTTClient.TLS
+        @test conn.protocol.host == "broker.example.com"
+        @test conn.protocol.port == 8883
+        @test conn.protocol.ca_file == "ca.crt"
+        @test conn.protocol.verify
+        @test_throws ArgumentError MQTTClient.TLS("broker.example.com"; cert_file="client.crt")
+    end
+
     @testset "MQTT UDS Connection" begin
         path = "/tmp/mqtt.sock"
         conn = MQTTClient.Connection(MQTTClient.IOConnection(path))

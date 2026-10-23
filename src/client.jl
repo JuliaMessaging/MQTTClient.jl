@@ -83,10 +83,13 @@ function write_loop(client::Client)::UInt8
                     mqtt_write(buffer, i)
                 end
                 data = take!(buffer)
+                # One write per packet: TLS streams do not support writing single bytes
+                frame = PipeBuffer()
+                write(frame, packet.cmd)
+                write_len(frame, length(data))
+                write(frame, data)
                 lock(client.socket_lock)
-                write(client.socket, packet.cmd)
-                write_len(client.socket, length(data))
-                write(client.socket, data)
+                write(client.socket, take!(frame))
                 unlock(client.socket_lock)
                 @atomicswap client.last_sent = time()
 
@@ -122,9 +125,9 @@ function read_loop(client::Client)::UInt8
     try
         while !isclosed(client)
             if !eof(client.socket)
-                cmd_flags = read(client.socket, UInt8)
+                cmd_flags = read_bytes(client.socket, 1)[1]
                 len = read_len(client.socket)
-                data = read(client.socket, len)
+                data = read_bytes(client.socket, len)
                 buffer = PipeBuffer(data)
                 cmd = cmd_flags & 0xF0
                 flags = cmd_flags & 0x0F
@@ -144,7 +147,9 @@ function read_loop(client::Client)::UInt8
         return 0x00
     catch e
         @debug "Read Loop threw a $(typeof(e)) Exception."
-        if !isa(e, EOFError)
+        # A TLS stream reports a peer that closes without a TLS close_notify (as brokers do after
+        # DISCONNECT) as an IOError("unexpected EOF") rather than an EOFError
+        if !isa(e, EOFError) && !isa(e, Base.IOError)
             @atomicswap client.state = 0x03
             ### Uncomment this for debugging the (async) read loop.
             # @error "READ LOOP ERROR"
@@ -174,8 +179,7 @@ function keep_alive_loop(client::Client)::UInt8
                 @atomicswap client.ping_outstanding = 0x1
                 try
                     lock(client.socket_lock)
-                    write(client.socket, PINGREQ)
-                    write(client.socket, 0x00)
+                    write(client.socket, UInt8[PINGREQ, 0x00])
                     unlock(client.socket_lock)
                     @atomicswap client.last_sent = time()
                 catch e

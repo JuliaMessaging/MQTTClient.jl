@@ -12,7 +12,7 @@ MQTT Client Library for Julia
 
 This library provides a MQTT Client and functions for interfacing with a standard MQTT broker. This includes publishing messages, and subscribing to topics to receive published messages. See the [documentation](https://JuliaMessaging.github.io/MQTTClient.jl) for more information.
 
-This package supports using Transmission Control Protocol (TCP) as well as Unix Domain Sockets (UDS) as the protocol to connect to the MQTT broker over. An example configuration for a `Mosquitto` broker can be found in the test folder. 
+This package supports using Transmission Control Protocol (TCP), TCP with TLS (when OpenSSL.jl is loaded) and Unix Domain Sockets (UDS) as the protocol to connect to the MQTT broker over. An example configuration for a `Mosquitto` broker can be found in the test folder. 
 
 ## Example Use
 

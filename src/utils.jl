@@ -56,11 +56,15 @@ function write_len(s::IO, len::Int64)
     end
 end
 
+# Reads exactly `nb` bytes. Unlike read(s, UInt8) or read(s, nb), this only needs unsafe_read, so it also
+# works on streams without byte I/O such as OpenSSL.SSLStream.
+read_bytes(s::IO, nb::Integer) = read!(s, Vector{UInt8}(undef, nb))
+
 function read_len(s::IO)
     multiplier = 1
     value = 0
     while true
-        b = read(s, UInt8)
+        b = read_bytes(s, 1)[1]
         value += (b & 127) * multiplier
         multiplier *= 128
         if multiplier > 128 * 128 * 128

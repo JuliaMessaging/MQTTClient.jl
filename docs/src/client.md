@@ -22,6 +22,12 @@ Passing a single path string will be infered as a UDS connection.
 ```julia
 client, connection = MakeConnection("/tmp/mqtt.sock")
 ```
+For TLS, load OpenSSL.jl and build the connection from a `MQTTClient.TLS` protocol. Without `ca_file`, the broker's certificate is checked against the system's CA roots.
+```julia
+using OpenSSL
+client = Client()
+connection = Connection(MQTTClient.TLS("broker.example.com", 8883; ca_file="ca.crt"); user=User("name", "pw"))
+```
 
 Additional information can be specified when the client and connection objects are constructed.
 ```julia

@@ -10,6 +10,51 @@ struct UDS <: AbstractIOConnection
 end
 
 """
+    TLS(host::AbstractString, port::Int64=8883; ca_file="", cert_file="", key_file="", verify=true)
+
+A TCP connection to `host` secured with TLS. Needs OpenSSL.jl: add it to your environment and run
+`using OpenSSL`.
+
+# Arguments
+
+  - `host`: The broker's host name, also checked against its certificate.
+  - `port`: The broker's TLS port.
+  - `ca_file`: PEM file with the CA certificates to trust. Empty uses the system's CA roots.
+  - `cert_file`, `key_file`: PEM files with a client certificate and its private key, for brokers that
+    require client authentication.
+  - `verify`: Whether to verify the broker's certificate and host name. Only turn this off for testing.
+
+# Example
+
+```julia
+using MQTTClient, OpenSSL
+client = Client()
+conn = Connection(MQTTClient.TLS("broker.example.com"; ca_file="ca.crt"); user=User("name", "password"))
+connect(client, conn)
+```
+"""
+struct TLS <: AbstractIOConnection
+    host::String
+    port::Int64
+    ca_file::String
+    cert_file::String
+    key_file::String
+    verify::Bool
+end
+function TLS(
+    host::AbstractString,
+    port::Int64=8883;
+    ca_file::AbstractString="",
+    cert_file::AbstractString="",
+    key_file::AbstractString="",
+    verify::Bool=true,
+)
+    isempty(cert_file) == isempty(key_file) ||
+        throw(ArgumentError("cert_file and key_file must be given together"))
+    return TLS(String(host), port, String(ca_file), String(cert_file), String(key_file), verify)
+end
+
+"""
     IOConnection(ip::IPAddr, port::Int64)
 
 Constructs a new `TCP` object with the specified IP address and port number.
@@ -69,11 +114,25 @@ Establishes a TCP connection to the given IP address and port specified in the `
 """
 connect(protocol::TCP) = connect(protocol.ip, protocol.port)
 
+# Implemented in ext/MQTTClientOpenSSLExt.jl
+function tls_connect end
+
+"""
+    connect(protocol::TLS)
+
+Opens a TCP connection to the broker and performs the TLS handshake. Needs `using OpenSSL`.
+"""
+function connect(protocol::TLS)
+    hasmethod(tls_connect, Tuple{TLS}) ||
+        error("TLS connections need OpenSSL.jl: add it to your environment and run `using OpenSSL`")
+    return tls_connect(protocol)
+end
+
 """
     Connection{T <: AbstractIOConnection}
 
 The `Connection` struct in Julia encapsulates the configuration and connection details required for an MQTT client to connect to an MQTT broker.
-This struct supports two types of connection protocols: TCP and Unix Domain Sockets (UDS), both of which are subtypes of `AbstractIOConnection`.
+This struct supports three types of connection protocols: TCP, TCP with TLS (`TLS`) and Unix Domain Sockets (UDS), all subtypes of `AbstractIOConnection`.
 The struct includes fields for protocol type, keep-alive interval, client ID, user credentials, a will message (a message that is sent by the broker if the client disconnects unexpectedly),
 and a flag indicating whether the session is clean (i.e., no persistent session state).
 The `Connection` constructor allows for flexible instantiation with default or specified values for each field,

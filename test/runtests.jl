@@ -36,6 +36,9 @@ include("smoke/smoketest.tcp.jl")
 # The broker needs to be configured for access with user:test passwd:test
 include("smoke/smoketest.secure.jl")
 
+## Needs to have a broker with a TLS listener on localhost[8884] and MQTT_TLS_CA set to its CA certificate
+include("smoke/smoketest.tls.jl")
+
 ## Needs to have a broker listening on /tmp/mqtt/mqtt.sock
 # The broker needs to be configured for anonymous access
 include("smoke/smoketest.uds.jl")
