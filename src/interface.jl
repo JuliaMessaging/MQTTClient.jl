@@ -224,7 +224,7 @@ result = connect(client, connection)
   - [`Client`](@ref)
   - [`Connection`](@ref)
 """
-connect(client::Client, connection::Connection) = fetch(connect_async(client, connection))
+connect(client::Client, connection::Connection) = resolve(connect_async(client, connection))
 
 """
     disconnect(client::Client)
@@ -281,6 +281,7 @@ future = subscribe_async(client, "my/topic", on_msg; qos=QOS_2)
 ```
 """
 function subscribe_async(client, topic, on_msg; qos=QOS_0)
+    isclosed(client) && throw(MQTTException("Not connected"))
     filter_wildcard_len_check(topic)
     future = Future()
     id = packet_id(client)
@@ -319,6 +320,7 @@ Deletes the callback from the client
 Returns a `Future` object that contains `nothing` on success and an exception on failure.
 """
 function unsubscribe_async(client::Client, topic::String)
+    isclosed(client) && throw(MQTTException("Not connected"))
     future = Future()
     id = packet_id(client)
     client.in_flight[id] = future
@@ -327,6 +329,7 @@ function unsubscribe_async(client::Client, topic::String)
     return future
 end
 function unsubscribe_async(client::Client, topics::String...)
+    isclosed(client) && throw(MQTTException("Not connected"))
     future = Future()
     id = packet_id(client)
     client.in_flight[id] = future
@@ -350,6 +353,7 @@ publish_async(client::Client, message::Message)
 Publishes the message. Returns a `Future` object that contains `nothing` on success and an exception on failure.
 """
 function publish_async(client::Client, message::Message)
+    isclosed(client) && throw(MQTTException("Not connected"))
     future = Future()
     optional = ()
     topic_wildcard_len_check(message.topic)

@@ -83,6 +83,9 @@ function write_loop(client::Client)::UInt8
                     mqtt_write(buffer, i)
                 end
                 data = take!(buffer)
+                # Mark the client as closing before the broker can answer DISCONNECT by closing the
+                # socket, so read_loop does not take that for a lost connection
+                packet.cmd === DISCONNECT && @atomicreplace client.state 0x01 => 0x02
                 lock(client.socket_lock)
                 write(client.socket, packet.cmd)
                 write_len(client.socket, length(data))
@@ -133,14 +136,19 @@ function read_loop(client::Client)::UInt8
                     @atomicswap client.last_received = time()
                     HANDLERS[cmd](client, buffer, cmd, flags)
                 else
-                    # TODO unexpected cmd protocol error
+                    close_with_error(client, MQTTException("Unexpected packet type 0x$(string(cmd; base=16))"))
                 end
             else
+                # End of stream without our DISCONNECT: the broker or the network dropped us
+                if isconnected(client)
+                    close_with_error(client, MQTTException("Connection lost"))
+                    break
+                end
                 sleep(0.0001)
             end
         end
 
-        @debug "ending write loop!"
+        @debug "ending read loop!"
         return 0x00
     catch e
         @debug "Read Loop threw a $(typeof(e)) Exception."
@@ -193,18 +201,9 @@ function keep_alive_loop(client::Client)::UInt8
 
         if @atomic(client.ping_outstanding) == 1 &&
             time() - ping_sent >= client.ping_timeout
-            try # No pingresp received
-                disconnect(client)
-                break
-            catch e
-                # channel closed
-                @atomicswap client.state = 0x03
-                if isa(e, InvalidStateException)
-                    break
-                else
-                    rethrow()
-                end
-            end
+            # No PINGRESP: the connection is half-open (e.g. the network went away without a FIN)
+            close_with_error(client, MQTTException("No PINGRESP within $(client.ping_timeout)s"))
+            break
             # TODO automatic reconnect
         end
 
@@ -224,6 +223,18 @@ end
 # write packet to mqtt broker
 function write_packet(client::Client, cmd::UInt8, data...)
     return put!(client.write_packets, Packet(cmd, data))
+end
+
+# Ends the session after an error such as a protocol violation (MQTT 3.1.1 section 4.8): every call
+# still waiting for the broker gets `e`, and the network connection is closed.
+function close_with_error(client::Client, e::MQTTException)
+    @atomicswap client.state = 0x03
+    for future in values(client.in_flight)
+        isready(future) || put!(future, e)
+    end
+    empty!(client.in_flight)
+    close(client.socket)
+    return nothing
 end
 
 isready(client::Client)::Bool = client.state == 0x00
