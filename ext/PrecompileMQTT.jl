@@ -19,9 +19,6 @@ using MQTTClient
     payload = "bar"
 
     @compile_workload begin
-        udsclient, udsconnection = MakeConnection("/tmp/mqtt.sock")
-        tcpclient, tcpconnection = MakeConnection("test.mosquitto.org", 1883)
-
         ## Handlers:
         # handle_connack
         c = MQTTClient.Client()

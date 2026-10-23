@@ -210,6 +210,7 @@ function keep_alive_loop(client::Client)::UInt8
 
         wait(timer)
     end
+    close(timer)
     return 0x00
 end
 
