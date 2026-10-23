@@ -77,11 +77,18 @@ function smoke_test(client, conn)
     # sleep(0.1)
     # publish(client, topic, payload)
 
-    # TODO: Fix this, there is some kind of problem either with mqtt or test that makes will not work.
-    # println("Testing connect will")
-    # disconnect(client)
-    # connect(client, MQTT_BROKER, MQTT_PORT, will=Message(false, MQTT.QOS_2, false, topic, payload))
-    # wait(condition)
+    println("Testing will message")
+    # The broker publishes the will only when a client drops without sending DISCONNECT
+    will_topic = "will/" * Random.randstring(8)
+    will_received = Channel{String}(1)
+    subscribe(client, will_topic, (t, p) -> put!(will_received, String(p)), qos=QOS_1)
+    will_client = Client()
+    will_conn = Connection(conn.protocol; will=MQTTClient.Message(QOS_1, will_topic, payload))
+    connect(will_client, will_conn)
+    @atomicswap will_client.state = 0x03
+    close(will_client.socket)
+    @test timedwait(() -> isready(will_received), 5.0) === :ok
+    @test isready(will_received) && take!(will_received) == payload
 
     @test isopen(client.socket)
     disconnect(client)

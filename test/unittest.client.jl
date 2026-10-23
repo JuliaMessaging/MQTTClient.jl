@@ -67,7 +67,7 @@ end
         message = MQTTClient.Message(
             false, UInt8(MQTTClient.QOS_2), false, "test/foo", "payload"
         )
-        optional = message.qos == 0x00 ? () : (2)
+        optional = message.qos == 0x00 ? () : (UInt16(2),)
         cmd =
             MQTTClient.PUBLISH |
             ((message.dup & 0x1) << 3) |
@@ -244,18 +244,17 @@ end
     end
 
     @testset "handle_publish" begin
-        #! TODO: fix this test.
         c = MQTTClient.Client()
         ch = Channel{String}(5)
-        cb1(t, p) = put!(ch, strip(String(p), '\0'))
-        cb2(t, p) = put!(ch, strip(String(p), '\0'))
+        cb1(t, p) = put!(ch, String(p))
+        cb2(t, p) = put!(ch, String(p))
         insert!(c.on_msg, "test", cb1)
         insert!(c.on_msg, "test/#", cb2)
 
         message = MQTTClient.Message(
             false, UInt8(MQTTClient.QOS_0), false, "test", "payload"
         )
-        optional = message.qos == 0x00 ? () : (0)
+        optional = message.qos == 0x00 ? () : (UInt16(0),)
         cmd =
             MQTTClient.PUBLISH |
             ((message.dup & 0x1) << 3) |
@@ -273,7 +272,7 @@ end
         message = MQTTClient.Message(
             false, UInt8(MQTTClient.QOS_1), false, "test", "payload"
         )
-        optional = message.qos == 0x00 ? () : (1)
+        optional = message.qos == 0x00 ? () : (UInt16(1),)
         cmd =
             MQTTClient.PUBLISH |
             ((message.dup & 0x1) << 3) |
@@ -287,11 +286,12 @@ end
         MQTTClient.handle_publish(c, buffer, 0x00, 0x02)
         payload = take!(ch)
         @test payload == "payload"
+        @test take!(c.write_packets) == MQTTClient.Packet(MQTTClient.PUBACK, (0x0001,))
 
         message = MQTTClient.Message(
             false, UInt8(MQTTClient.QOS_2), false, "test", "payload"
         )
-        optional = message.qos == 0x00 ? () : (2)
+        optional = message.qos == 0x00 ? () : (UInt16(2),)
         cmd =
             MQTTClient.PUBLISH |
             ((message.dup & 0x1) << 3) |
@@ -305,11 +305,12 @@ end
         MQTTClient.handle_publish(c, buffer, 0x00, 0x04)
         payload = take!(ch)
         @test payload == "payload"
+        @test take!(c.write_packets) == MQTTClient.Packet(MQTTClient.PUBREC, (0x0002,))
 
         message = MQTTClient.Message(
             false, UInt8(MQTTClient.QOS_2), false, "test/foo", "payload"
         )
-        optional = message.qos == 0x00 ? () : (2)
+        optional = message.qos == 0x00 ? () : (UInt16(2),)
         cmd =
             MQTTClient.PUBLISH |
             ((message.dup & 0x1) << 3) |
@@ -323,6 +324,7 @@ end
         MQTTClient.handle_publish(c, buffer, 0x00, 0x04)
         payload = take!(ch)
         @test payload == "payload"
+        @test take!(c.write_packets) == MQTTClient.Packet(MQTTClient.PUBREC, (0x0002,))
 
         # on_msg["test/#"] = (t,p) -> put!(ch, p == "payload4")
         # io = IOBuffer(Vector{UInt8}("\0\x08test/foopayload4"))
@@ -355,15 +357,14 @@ end
         cmd = 0x50
         flags = 0x02
 
-        # Write the packet ID to the IO object
-        write(s, UInt16(3))
+        # Write the packet ID to the IO object (MQTT integers are big-endian)
+        write(s, hton(UInt16(3)))
         seekstart(s)
 
         # Call the handle_pubrec function
         MQTTClient.handle_pubrec(c, s, cmd, flags)
         p = take!(c.write_packets)
-        #!TODO: Figure out why the id changes
-        @test p == MQTTClient.Packet(MQTTClient.PUBREL | 0x02, (0x0300,))
+        @test p == MQTTClient.Packet(MQTTClient.PUBREL | 0x02, (0x0003,))
     end
 
     @testset "handle_pubrel" begin
@@ -374,37 +375,37 @@ end
         cmd = 0x62
         flags = 0x02
 
-        # Write the packet ID to the IO object
-        write(s, UInt16(1))
+        # Write the packet ID to the IO object (MQTT integers are big-endian)
+        write(s, hton(UInt16(1)))
         seekstart(s)
 
         # Call the handle_pubrel function
         MQTTClient.handle_pubrel(c, s, cmd, flags)
         p = take!(c.write_packets)
-        @test p == MQTTClient.Packet(MQTTClient.PUBCOMP, (0x0100,))
+        @test p == MQTTClient.Packet(MQTTClient.PUBCOMP, (0x0001,))
     end
 
     @testset "handle_suback" begin
         c = MQTTClient.Client()
-        s = IOBuffer()
+        # read_loop hands handlers a PipeBuffer, so take! returns only the unread bytes
+        s = PipeBuffer()
 
         # Set the cmd and flags values
         cmd = 0x90
         flags = 0x00
 
         # Write the packet ID and return code to the IO object
-        write(s, UInt16(1))
+        write(s, hton(UInt16(1)))
         write(s, UInt8(0x00))
-        seekstart(s)
 
-        c.in_flight[0x0100] = Future()
+        c.in_flight[0x0001] = Future()
 
         # Call the handle_suback function
         MQTTClient.handle_suback(c, s, cmd, flags)
 
         # Check that the in_flight dictionary was updated correctly
-        future = c.in_flight[0x0100]
-        @test fetch(future) == UInt8[0x01, 0x00, 0x00]
+        future = c.in_flight[0x0001]
+        @test fetch(future) == UInt8[0x00]
     end
 
     @testset "handle_pingresp" begin
