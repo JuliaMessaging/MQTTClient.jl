@@ -66,7 +66,7 @@ Subscribes the `Client` instance, provided as a parameter, to the specified topi
 
 #### Arguments
 **Required arguments:**
-* **client**::Client: The connected client to subscribe on. TODO phrasing?
+* **client**::Client: A connected client.
 * **topic**::String: The name of the topic.
 * **on_msg**::Function: the callback function for that topic.
 * **qos**::QOS: the named argument to set the QOS, defaults to QOS_0.

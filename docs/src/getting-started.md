@@ -70,6 +70,14 @@ For storing messages that are awaiting acknowledgment, `Client` has a `Dict`, ma
 
 Once the connect method is called on a `Client`, relevant fields are initialized and the julia `connect` method is called to get a connected socket. Then two background tasks are started that perpetually check for messages to send and receive. If `keep_alive` is non-zero another tasks get started that handles sending the keep alive and verifying the pingresp arrived in time.
 
-TODO explain read and write loop a bit
+### Read and write loops
 
-TODO explain topic trie structure
+`write_loop` takes packets off `write_packets`, serialises each one and writes it to the socket while holding `socket_lock`, so it never interleaves with the keep-alive task's `PINGREQ`. Every write updates `last_sent`. It stops after writing a `DISCONNECT`, or when the client is closed.
+
+`read_loop` reads one packet at a time from the socket: the fixed header byte (packet type in the high four bits, flags in the low four), the remaining length, then the body. It looks up the handler for the packet type in `HANDLERS` and calls it with the body as a `PipeBuffer`. Every packet it reads updates `last_received`. Handlers complete the matching `Future` in `in_flight` (CONNACK, SUBACK, UNSUBACK, PUBACK, PUBCOMP), reply to the broker through `write_packets` (PUBACK and PUBREC for incoming QoS 1 and 2 messages, PUBREL, PUBCOMP), or call the subscription callback (PUBLISH). The loop runs until the client is closed.
+
+`keep_alive_loop` checks once per second whether `keep_alive` seconds have passed since the last packet was sent or since the last one was received and, if so, sends a `PINGREQ`. If no `PINGRESP` arrives within `ping_timeout`, it disconnects.
+
+### Topic trie
+
+Subscription callbacks are stored in `on_msg`, a trie keyed by topic level: `subscribe(client, "sensors/+/temp", cb)` stores `cb` under the path `sensors` -> `+` -> `temp`. When a message arrives, its topic is split on `/` and looked up one level at a time. At each level an exact match is tried first, then the single-level wildcard `+`, then the multi-level wildcard `#`, which matches everything below that level. The first callback found is called with the topic and payload; if none matches, the message is logged at debug level and dropped. `unsubscribe` removes the callback from the trie.
