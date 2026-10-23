@@ -51,6 +51,7 @@ mutable struct Client <: AbstractConfigElement
     write_task::Task
     read_task::Task
     keep_alive_task::Task
+    keep_alive_timer::Union{Timer,Nothing}
 
     function Client(ping_timeout::UInt64=UInt64(60))
         return new(
@@ -69,6 +70,7 @@ mutable struct Client <: AbstractConfigElement
             Task(nothing),
             Task(nothing),
             Task(nothing),
+            nothing,
         )
     end
 end
@@ -162,10 +164,11 @@ end
 function keep_alive_loop(client::Client)::UInt8
     ping_sent = time()
 
-    # TODO: improve, this causes reconnect to take ~1 second. is there a way to interupt?
     check_interval = 1
 
+    # disconnect closes the timer to end the loop without waiting for the next tick
     timer = Timer(0; interval=check_interval)
+    client.keep_alive_timer = timer
 
     while !isclosed(client)
         if time() - @atomic(client.last_sent) >= client.keep_alive ||
@@ -208,8 +211,14 @@ function keep_alive_loop(client::Client)::UInt8
             # TODO automatic reconnect
         end
 
-        wait(timer)
+        try
+            wait(timer)
+        catch e
+            isa(e, EOFError) || rethrow()
+            break
+        end
     end
+    close(timer)
     return 0x00
 end
 

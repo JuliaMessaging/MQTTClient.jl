@@ -79,6 +79,21 @@ end
         @test_throws IOError MQTTClient.write_loop(c)
     end
 
+    @testset "keep_alive_loop stops when its timer is closed" begin
+        c = MQTTClient.Client()
+        c.keep_alive = 0x003c
+        @atomicswap c.last_sent = time()
+        @atomicswap c.last_received = time()
+        @atomicswap c.state = 0x01
+        task = @async MQTTClient.keep_alive_loop(c)
+        sleep(0.1)
+        @atomicswap c.state = 0x02
+        close(c.keep_alive_timer)
+        # without the close, the loop would sleep until its next 1s tick
+        @test timedwait(() -> istaskdone(task), 0.5) === :ok
+        @test fetch(task) == 0x00
+    end
+
     @testset "packet_id" begin
         c = MQTTClient.Client()
         @atomicswap c.last_id = typemax(UInt16)

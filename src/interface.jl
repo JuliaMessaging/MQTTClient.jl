@@ -242,6 +242,7 @@ function disconnect(client::Client)
     end
 
     @atomicreplace client.state 0x01 => 0x02
+    isnothing(client.keep_alive_timer) || close(client.keep_alive_timer)
 
     eof(client.socket)
 
