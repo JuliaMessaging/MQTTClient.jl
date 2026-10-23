@@ -224,7 +224,7 @@ result = connect(client, connection)
   - [`Client`](@ref)
   - [`Connection`](@ref)
 """
-connect(client::Client, connection::Connection) = fetch(connect_async(client, connection))
+connect(client::Client, connection::Connection) = resolve(connect_async(client, connection))
 
 """
     disconnect(client::Client)

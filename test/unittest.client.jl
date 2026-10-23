@@ -60,6 +60,17 @@ end
         ]
     end
 
+    @testset "read_loop: unexpected packet type" begin
+        c = MQTTClient.Client()
+        @atomicswap c.state = 0x01
+        pending = c.in_flight[0x0001] = Future()
+        # 0xF0 (AUTH in MQTT 5) is reserved in MQTT 3.1.1
+        c.socket = PipeBuffer(UInt8[0xF0, 0x00])
+        @test MQTTClient.read_loop(c) == 0x00
+        @test MQTTClient.isclosed(c)
+        @test fetch(pending) isa MQTTException
+    end
+
     @testset "write_loop" begin
         c = MQTTClient.Client()
         c.socket = TCPSocket()
@@ -230,17 +241,14 @@ end
         future = MQTTClient.handle_connack(c, io, 0x00, 0x00)
         @test fetch(future) == 0x00
 
-        # Test unsuccessful connection
+        # Test unsuccessful connection: the connect call gets the error and the socket is closed
         io = IOBuffer(UInt8[0x01, 0x01])
         c.in_flight[0x0000] = Future()
         future = MQTTClient.handle_connack(c, io, 0x00, 0x00)
         @test fetch(future) isa MQTTException
-
-        # Test unsuccessful connection
-        io = IOBuffer(UInt8[0x01, 0x01])
-        @test_throws ErrorException MQTTClient.handle_connack(c, io, 0x00, 0x00)
-
         @test MQTTClient.isclosed(c)
+        @test !isopen(c.socket)
+        @test_throws MQTTException MQTTClient.resolve(future)
     end
 
     @testset "handle_publish" begin
@@ -339,12 +347,15 @@ end
         MQTTClient.handle_ack(c, io, 0x00, 0x00)
         @test !haskey(c.in_flight, 0x0001)
 
-        c.in_flight[0x0002] = Future()
+        pending = c.in_flight[0x0002] = Future()
 
-        # Test unsuccessful ack
+        # Test unsuccessful ack: a protocol error fails the pending call and closes the socket
         io = IOBuffer(UInt8[0x00, 0x01])
         MQTTClient.handle_ack(c, io, 0x00, 0x00)
         @test c.state === 0x03
+        @test fetch(pending) isa MQTTException
+        @test isempty(c.in_flight)
+        @test !isopen(c.socket)
     end
 
     @testset "handle_pubrec" begin
